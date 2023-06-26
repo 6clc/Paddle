@@ -50,6 +50,7 @@ include(${CMAKE_BINARY_DIR}/cmake/cinn/config.cmake)
 if(WITH_MKL)
   generate_dummy_static_lib(LIB_NAME "cinn_mklml" GENERATOR "mklml.cmake")
   target_link_libraries(cinn_mklml ${MKLML_LIB} ${MKLML_IOMP_LIB})
+  add_dependencies(cinn_mklml ${MKLML_PROJECT})
   add_definitions(-DCINN_WITH_MKL_CBLAS)
 endif()
 if(WITH_MKLDNN)
@@ -86,6 +87,7 @@ if(WITH_GPU)
   find_library(CURAND libcurand.so HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib64 /usr/lib /usr/lib64 REQUIRED)
   find_library(CUSOLVER libcusolver.so HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib64 /usr/lib /usr/lib64 REQUIRED)
 endif()
+  include_directories(/usr/lib/x86_64-linux-gnu)
 
 set(cinnapi_src CACHE INTERNAL "" FORCE)
 set(core_src CACHE INTERNAL "" FORCE)
@@ -303,25 +305,25 @@ set(CINN_LIB_NAME "libcinnapi.so")
 set(CINN_LIB_LOCATION "${CMAKE_BINARY_DIR}/dist/cinn/lib")
 set(CINN_LIB "${CINN_LIB_LOCATION}/${CINN_LIB_NAME}")
 
-######################################
-# Add CINN's dependencies header files
-######################################
-
-# Add absl
-set(ABSL_INCLUDE_DIR "${CMAKE_BINARY_DIR}/dist/third_party/absl/include")
-include_directories(${ABSL_INCLUDE_DIR})
-
-# Add isl
-set(ISL_INCLUDE_DIR "${CMAKE_BINARY_DIR}/dist/third_party/isl/include")
-include_directories(${ISL_INCLUDE_DIR})
-
-# Add LLVM
-set(LLVM_INCLUDE_DIR "${CMAKE_BINARY_DIR}/dist/third_party/llvm/include")
-include_directories(${LLVM_INCLUDE_DIR})
-
-######################################################
-# Put external_cinn and dependencies together as a lib
-######################################################
-
+# ######################################
+# # Add CINN's dependencies header files
+# ######################################
+#
+# # Add absl
+# set(ABSL_INCLUDE_DIR "${CMAKE_BINARY_DIR}/dist/third_party/absl/include")
+# include_directories(${ABSL_INCLUDE_DIR})
+#
+# # Add isl
+# set(ISL_INCLUDE_DIR "${CMAKE_BINARY_DIR}/dist/third_party/isl/include")
+# include_directories(${ISL_INCLUDE_DIR})
+#
+# # Add LLVM
+# set(LLVM_INCLUDE_DIR "${CMAKE_BINARY_DIR}/dist/third_party/llvm/include")
+# include_directories(${LLVM_INCLUDE_DIR})
+#
+# ######################################################
+# # Put external_cinn and dependencies together as a lib
+# ######################################################
+#
 set(CINN_INCLUDE_DIR "${CMAKE_BINARY_DIR}/dist/cinn/include")
 include_directories(${CINN_INCLUDE_DIR})

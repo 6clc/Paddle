@@ -39,6 +39,7 @@ set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH}"
 include_directories(${MKLDNN_INC_DIR}
 )# For MKLDNN code to include internal headers.
 
+message("liuchao cxx " ${CMAKE_CXX_FLAGS})
 if(NOT WIN32)
   set(MKLDNN_FLAG
       "-Wno-error=strict-overflow -Wno-error=unused-result -Wno-error=array-bounds"

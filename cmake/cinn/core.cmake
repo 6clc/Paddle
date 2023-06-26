@@ -75,7 +75,7 @@ function(cinn_cc_test TARGET_NAME)
     get_property(os_dependency_modules GLOBAL PROPERTY OS_DEPENDENCY_MODULES)
     target_link_libraries(${TARGET_NAME} ${os_dependency_modules}
                           cinn_gtest_main gtest glog ${cinn_cc_test_DEPS})
-    add_dependencies(${TARGET_NAME} cinn_gtest_main gtest glog
+    add_dependencies(${TARGET_NAME} cinn_gtest_main gtest glog absl
                      ${cinn_cc_test_DEPS})
 
     add_test(

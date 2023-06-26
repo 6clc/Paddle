@@ -813,6 +813,7 @@ def run_cmake_build(build_path):
     )
     build_args = ["--build", ".", "--target", "install", "--config", build_type]
     max_jobs = os.getenv("MAX_JOBS")
+    max_jobs = "60"
     if max_jobs is not None:
         max_jobs = max_jobs or str(multiprocessing.cpu_count())
 

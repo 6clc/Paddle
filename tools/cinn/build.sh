@@ -24,7 +24,7 @@ cinn_whl_path=python/dist/cinn-0.0.0-py3-none-any.whl
 
 #export LLVM11_DIR=${workspace}/THIRDS/usr
 
-JOBS=8
+JOBS=60
 cuda_config=OFF
 cudnn_config=OFF
 

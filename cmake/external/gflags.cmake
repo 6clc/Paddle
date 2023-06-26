@@ -34,6 +34,7 @@ else()
 endif()
 
 include_directories(${GFLAGS_INCLUDE_DIR})
+set(CMAKE_CXX_FLAGS "-std=c++17 ${CMAKE_CXX_FLAGS}")
 
 if(WITH_ARM_BRPC)
   set(ARM_GFLAGS_URL

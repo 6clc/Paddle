@@ -62,6 +62,7 @@ else()
     set(GTEST_CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
   endif()
 endif()
+message("liuchao gtest " ${GTEST_CMAKE_CXX_FLAGS})
 
 
 if(WITH_MKLML)

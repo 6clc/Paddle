@@ -34,6 +34,7 @@ else()
   set(GLOG_CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
 endif()
 
+set(GLOG_CMAKE_CXX_FLAGS "-std=c++17 ${CMAKE_CXX_FLAGS}")
 include_directories(${GLOG_INCLUDE_DIR})
 
 if(WITH_ARM_BRPC)
