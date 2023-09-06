@@ -15,8 +15,10 @@ from cinn.ir import IrCompare
 from cinn.runtime import CinnLowerLevelIrJit
 
 
-def assert_llir_equal(llir1, llir2, allow_name_suffix_diff=True):
-    comparer = IrCompare(allow_name_suffix_diff)
+def assert_llir_equal(
+    llir1, llir2, allow_name_suffix_diff=True, only_compare_structure=True
+):
+    comparer = IrCompare(allow_name_suffix_diff, only_compare_structure)
 
     if isinstance(llir1, CinnLowerLevelIrJit):
         llir1_expr = llir1.convert_to_llir().body()
