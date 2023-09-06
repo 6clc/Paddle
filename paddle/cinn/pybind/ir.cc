@@ -583,6 +583,15 @@ void BindIrIr(py::module *m) {
   py::class_<ir::ScheduleBlockRealize, ir::ExprNode<ir::ScheduleBlockRealize>>
       schedule_block_realize(*m, "ScheduleBlockRealize");
   schedule_block_realize.def_static("make", &ir::ScheduleBlockRealize::Make);
+
+  DefineExprNode<ir::IfThenElse>(m, "IfThenElse");
+  py::class_<ir::IfThenElse> if_then_else(*m, "IfThenElse");
+  if_then_else.def_static(
+      "make",
+      py::overload_cast<Expr, Expr, Expr>(&ir::IfThenElse::Make),
+      py::arg("condition"),
+      py::arg("true_case"),
+      py::arg("false_case") = ir::Expr());
 }
 
 void BindOperation(py::module *m) {

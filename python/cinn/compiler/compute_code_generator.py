@@ -78,8 +78,7 @@ class ComputeCodeGenerator(ast.NodeVisitor):
             self.set_value(arg_name, llir_value)
 
         # 2. Construct body of function
-        stmts = self.visit_compound_statement(node.body)
-        body = ir.Block.make(stmts)
+        body = self.visit_compound_statement(node.body)
         body = ir.ScheduleBlockRealize.make(
             [], ir.ScheduleBlock.make([], [], [], "root", body)
         )
@@ -99,7 +98,7 @@ class ComputeCodeGenerator(ast.NodeVisitor):
             if str(cinn_stmt) in ["no compute"]:
                 continue
             cinn_stmts.append(cinn_stmt)
-        return cinn_stmts
+        return ir.Block.make(cinn_stmts)
 
     def visit_arguments(self, node):
         """
@@ -174,7 +173,6 @@ class ComputeCodeGenerator(ast.NodeVisitor):
 
         # 2. Parse the body of the For loop
         llir_for_body = self.visit_compound_statement(node.body)
-        llir_for_body = ir.Block.make(llir_for_body)
         for_expr = ir.For.make(
             llir_var, llir_for_min, llir_for_extent, llir_for_body
         )
@@ -301,6 +299,7 @@ class ComputeCodeGenerator(ast.NodeVisitor):
             len(node.ops) == 1
         ), "Only binary comparison symbols are supported. Expressions such as '1 <= a < 10' are not supported."
         args = [node.left, *node.comparators]
+        args = [self.visit(item) for item in args]
         ast2cinn = {
             ast.Eq: ir.EQ,
             ast.NotEq: ir.NE,
@@ -309,7 +308,15 @@ class ComputeCodeGenerator(ast.NodeVisitor):
             ast.Gt: ir.GT,
             ast.GtE: ir.GE,
         }
-        return ast2cinn[type(node.op)].make(*args)
+        return ast2cinn[type(node.ops[0])].make(*args)
+
+    def visit_If(self, node):
+        condition_expr = self.visit(node.test)
+        true_expr = self.visit_compound_statement(node.body)
+        if len(node.orelse) == 0:
+            return ir.IfThenElse.make(condition_expr, true_expr)
+        false_expr = self.visit_compound_statement(node.orelse)
+        return ir.IfThenElse.make(condition_expr, true_expr, false_expr)
 
     def set_value(self, name, value: Union[ir.Tensor, ir.Var]):
         if isinstance(value, ir.Tensor):

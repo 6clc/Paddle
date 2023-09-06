@@ -83,6 +83,45 @@ def test_split():
     assert_llir_equal(elementwise_split, elementwise_split_inferred_factor)
 
 
+def test_split_predicate():
+    @to_cinn_llir
+    def elementwise_split_predicate(
+        X: DataArray((128, 128, 128)), Y: DataArray((128, 128, 128))
+    ):
+        for i in range(128):
+            for j in range(128):
+                for k in range(128):
+                    sch.split(i, factors=[1000, 1, 64])
+                    sch.split(j, factors=[4, 32])
+                    sch.split(k, factors=[16, 8])
+                    i1 = i
+                    j1 = j
+                    k1 = k
+                    Y[i1, j1, k1] = X[i1, j1, k1] * 2.0
+
+    @to_cinn_llir
+    def elementwise_split_predicate_gt(
+        X: DataArray((128, 128, 128)), Y: DataArray((128, 128, 128))
+    ):
+        for i in range(1000):
+            for i_0 in range(1):
+                for i_1 in range(64):
+                    if ((64 * i) + ((64 * i_0) + i_1)) < 128:
+                        for j in range(4):
+                            for j_0 in range(32):
+                                for k in range(16):
+                                    for k_0 in range(8):
+                                        i1 = (64 * i) + ((64 * i_0) + i_1)
+                                        j1 = (32 * j) + j_0
+                                        k1 = (8 * k) + k_0
+                                        Y[i1, j1, k1] = X[i1, j1, k1] * 2.0
+
+    assert_llir_equal(
+        elementwise_split_predicate, elementwise_split_predicate_gt
+    )
+
+
 if __name__ == "__main__":
     test_fuse()
     test_split()
+    test_split_predicate()

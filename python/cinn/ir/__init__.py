@@ -127,6 +127,7 @@ from ..core_api.ir import (  # noqa: F401
     ScheduleBlock,
     ScheduleBlockRealize,
     IrCompare,
+    IfThenElse,
 )
 
 
