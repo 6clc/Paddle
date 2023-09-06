@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import ast
-from typing import Union
+from typing import List, Union
 
 from cinn import ir
 from cinn.runtime.data_array import DataArray
@@ -183,6 +183,9 @@ class ComputeCodeGenerator(ast.NodeVisitor):
         if type(node.ctx) == ast.Store:
             if node.id in self.variables_table:
                 return self.variables_table[node.id]
+
+            # ir::Tensor is not the same store as ir::Var.
+            # Let's hand it over to the call
             return node.id
         # Load Node
         assert (
@@ -248,10 +251,17 @@ class ComputeCodeGenerator(ast.NodeVisitor):
             self.schedule_block_iter_var2expr = {}
             return schedule_block
         else:
-            iter_var = ir.Var(lhs.id)
-            iter_var_expr = ir.Expr(iter_var)
-            self.set_value(lhs.id, iter_var_expr)
-            self.schedule_block_iter_var2expr[iter_var] = rhs_expr
+            iter_var_ids = self.visit(lhs)
+            rhs_exprs = rhs_expr
+            if not isinstance(iter_var_ids, List):
+                iter_var_ids = [iter_var_ids]
+                rhs_exprs = [rhs_expr]
+            for i in range(len(iter_var_ids)):
+                iter_var = ir.Var(iter_var_ids[i])
+                iter_var_expr = ir.Expr(iter_var)
+                self.set_value(iter_var_ids[i], iter_var_expr)
+                self.schedule_block_iter_var2expr[iter_var] = rhs_exprs[i]
+
             return "no compute"
 
     def visit_Constant(self, node):
