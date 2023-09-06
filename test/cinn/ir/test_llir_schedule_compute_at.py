@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from test.cinn.utils.testing import assert_llir_equal
+
 import cinn.schedule as sch
 from cinn import to_cinn_llir
 from cinn.runtime.data_array import DataArray
@@ -36,7 +38,23 @@ def test_compute_at_elementwise():
                 j1 = j3
                 Y[i1, j1] = A[i1, j1] + 2.0
 
-    print(elementwise_add)
+    @to_cinn_llir
+    def elementwise_add_gt(
+        X: DataArray((128, 128)),
+        Y: DataArray((128, 128)),
+        A: DataArray((128, 128)),
+    ):
+        for i in range(128):
+            for j in range(128):
+                i1 = i
+                j1 = 0 + j
+                A[i1, j1] = X[i1, j1] * 2.0
+            for k in range(128):
+                i2 = i
+                k1 = k
+                Y[i2, k1] = A[i2, k1] + 2.0
+
+    assert_llir_equal(elementwise_add, elementwise_add_gt)
 
 
 if __name__ == '__main__':

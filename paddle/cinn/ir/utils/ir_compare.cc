@@ -371,12 +371,13 @@ bool IrEqualVisitor::Visit(const ScheduleBlock* lhs, const Expr* other) {
   bool flag = Compare(lhs->iter_vars, rhs->iter_vars) &&
               Compare(lhs->read_buffers, rhs->read_buffers) &&
               Compare(lhs->write_buffers, rhs->write_buffers) &&
-              Compare(lhs->attrs, rhs->attrs) && Compare(lhs->body, rhs->body);
+              Compare(lhs->body, rhs->body);
 
   if (only_compare_sturcture_) {
     return flag;
   }
-  return flag && Compare(lhs->name, rhs->name);
+  return flag && Compare(lhs->attrs, rhs->attrs) &&
+         Compare(lhs->name, rhs->name);
 }
 
 bool IrEqualVisitor::Visit(const ScheduleBlockRealize* lhs, const Expr* other) {
