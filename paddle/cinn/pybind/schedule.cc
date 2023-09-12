@@ -58,6 +58,7 @@ void BindSchedule(py::module *m) {
            py::arg("keep_unit_loops") = false)
       .def("compute_inline",
            py::overload_cast<const Expr &>(&ir::IRSchedule::ComputeInline))
+      .def("bind", &ir::IRSchedule::Bind)
       .def("get_module",
            py::overload_cast<>(&ir::IRSchedule::GetModule, py::const_))
       .def("get_block",

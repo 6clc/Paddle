@@ -36,6 +36,8 @@
 #include "paddle/cinn/poly/stage.h"
 #include "paddle/cinn/pybind/bind.h"
 #include "paddle/cinn/pybind/bind_utils.h"
+#include "paddle/cinn/pybind/ir/ir_context.h"
+#include "paddle/cinn/pybind/ir/ir.h"
 
 namespace py = pybind11;
 
@@ -574,16 +576,6 @@ void BindIrIr(py::module *m) {
   py::class_<ir::ModuleExpr> module_expr(*m, "ModuleExpr");
   module_expr.def(py::init<const std::vector<Expr> &>());
 
-  DefineExprNode<ir::ScheduleBlock>(m, "ScheduleBlock");
-  py::class_<ir::ScheduleBlock, ir::ExprNode<ir::ScheduleBlock>> schedule_block(
-      *m, "ScheduleBlock");
-  schedule_block.def_static("make", &ir::ScheduleBlock::Make);
-
-  DefineExprNode<ir::ScheduleBlockRealize>(m, "ScheduleBlockRealize");
-  py::class_<ir::ScheduleBlockRealize, ir::ExprNode<ir::ScheduleBlockRealize>>
-      schedule_block_realize(*m, "ScheduleBlockRealize");
-  schedule_block_realize.def_static("make", &ir::ScheduleBlockRealize::Make);
-
   DefineExprNode<ir::IfThenElse>(m, "IfThenElse");
   py::class_<ir::IfThenElse> if_then_else(*m, "IfThenElse");
   if_then_else.def_static(
@@ -809,6 +801,31 @@ void BindRegistry(py::module *m) {
       });
 #endif
 }
+
+void BindIrContext(py::module *m) {
+  using ir::Expr;
+  using ir::IrNode;
+  using ir::IrNodeRef;
+  using ir::Var;
+  using py::arg;
+
+  py::class_<IRBuilder> ir_builder(*m, "IRBuilder");
+  ir_builder.def(py::init<>())
+      .def("EnterWithContext", &IRBuilder::EnterWithContext)
+      .def("ExitWithContext", &IRBuilder::ExitWithContext)
+      .def("get", [](IRBuilder&self) {
+          return self->Get();
+      });
+
+  py::class_<ScheduleBlockContextNode> sch_block_ctx(*m, "ScheduleBlockContextNode");
+  sch_block_ctx.def(py::init<>())
+    .def("EnterWithContext", &ScheduleBlockContextNode::EnterWithContext)
+    .def("ExitWithContext", &ScheduleBlockContextNode::ExitWithContext);
+
+  m->def("AxisMap", &AxisMap);
+  m->def("TensorStore", &TensorStore);
+}
+
 }  // namespace
 
 void BindIr(py::module *m) {
@@ -818,6 +835,7 @@ void BindIr(py::module *m) {
   BindIrVisitor(m);
   BindIrIr(m);
   BindIrTensor(m);
+  BindIrContext(m);
   BindPackedFunc(m);
   BindRegistry(m);
 }

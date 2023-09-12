@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .ir_context import IRBuilder
 from ..core_api.ir import (  # noqa: F401
     Add,
     And,
@@ -124,8 +125,6 @@ from ..core_api.ir import (  # noqa: F401
     Buffer,
     For,
     ModuleExpr,
-    ScheduleBlock,
-    ScheduleBlockRealize,
     IrCompare,
     IfThenElse,
 )

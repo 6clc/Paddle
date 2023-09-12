@@ -27,12 +27,21 @@ class ComputeCodeGenerator(ast.NodeVisitor):
     containing only the semantics of the compute part
     """
 
-    def __init__(self, function_name, inputs_signature):
+    def __init__(self, fn, function_name, inputs_signature):
+        self.fn = fn
         self.function_name = function_name
         self.inputs_signature = inputs_signature
         self.cinn_llir_func = None
         self.variables_table = {}
         self.schedule_block_iter_var2expr = {}
+        self.cur_schedule_block_name = ""
+
+    def parse(self):
+        ast_node = self.fn.parse()
+        with ir.IRBuilder() as builder:
+            print("hello world")
+            # self.visit(ast_node)
+        return builder.get()
 
     def visit_FunctionDef(self, node) -> None:
         """
@@ -159,7 +168,8 @@ class ComputeCodeGenerator(ast.NodeVisitor):
         assert (
             len(iter_args) <= 2
         ), "CINN Low Level IR does not support setting the range step"
-        ast_min = iter_args[0] if len(iter_args) > 1 else self.visit(ast.Num(0))
+        ast_min = iter_args[0] if len(
+            iter_args) > 1 else self.visit(ast.Num(0))
         ast_extent = iter_args[1] if len(iter_args) > 1 else iter_args[0]
 
         # TODO(6clc): support sub region's local variable
@@ -181,9 +191,6 @@ class ComputeCodeGenerator(ast.NodeVisitor):
     def visit_Name(self, node):
         # Store Node
         if type(node.ctx) == ast.Store:
-            if node.id in self.variables_table:
-                return self.variables_table[node.id]
-
             # ir::Tensor is not the same store as ir::Var.
             # Let's hand it over to the call
             return node.id
@@ -234,6 +241,7 @@ class ComputeCodeGenerator(ast.NodeVisitor):
         rhs_expr = self.visit(node.value)
 
         # 2 parse LHS
+        # 2.1 ScheduleBlockRealize
         if isinstance(lhs, ast.Subscript):
             expr_tensor, expr_indices = self.visit(lhs)
 
@@ -244,12 +252,18 @@ class ComputeCodeGenerator(ast.NodeVisitor):
                     list(self.schedule_block_iter_var2expr.keys()),
                     [],
                     [],
-                    lhs.value.id,
+                    lhs.value.id if self.cur_schedule_block_name == "" else self.cur_schedule_block_name,
                     tensor_body,
                 ),
             )
             self.schedule_block_iter_var2expr = {}
             return schedule_block
+        # 2.2 Attribute of Var
+        elif isinstance(lhs, ast.Attribute):
+            iter_var = self.visit(lhs.value)
+            setattr(iter_var.as_var_mutable(), lhs.attr, self.eval(node.value))
+            return "no compute"
+        # 2.3 Var
         else:
             iter_var_ids = self.visit(lhs)
             rhs_exprs = rhs_expr
@@ -328,7 +342,27 @@ class ComputeCodeGenerator(ast.NodeVisitor):
         false_expr = self.visit_compound_statement(node.orelse)
         return ir.IfThenElse.make(condition_expr, true_expr, false_expr)
 
+    def visit_With(self, node):
+        for item in node.items:
+            frame = self.eval_expr(item.context_expr)
+            rhs = frame
+            if item.optional_vars is not None:
+                self.eval_assign(target=item.optional_vars, source=rhs)
+        body = self.visit_compound_statement(node.body)
+        return body
+
     def set_value(self, name, value: Union[ir.Tensor, ir.Var]):
         if isinstance(value, ir.Tensor):
             value = value.Expr()
         self.variables_table[name] = value
+
+    def eval(self, node):
+        return getattr(self, f'eval_{type(node).__name__}')(node)
+
+    def eval_Constant(self, node):
+        return self.eval_expression(node)
+
+    def eval_expression(self, node):
+        return eval(
+            compile(ast.Expression(body=node), filename='', mode='eval')
+        )
