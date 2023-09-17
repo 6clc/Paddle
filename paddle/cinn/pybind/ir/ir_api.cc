@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "paddle/cinn/common/shared.h"
 #include "paddle/cinn/ir/ir.h"
 
 #include <llvm/Support/FormatVariadic.h>
@@ -36,10 +37,12 @@
 #include "paddle/cinn/poly/stage.h"
 #include "paddle/cinn/pybind/bind.h"
 #include "paddle/cinn/pybind/bind_utils.h"
-#include "paddle/cinn/pybind/ir/ir_context.h"
 #include "paddle/cinn/pybind/ir/ir.h"
+#include "paddle/cinn/pybind/ir/ir_context.h"
 
 namespace py = pybind11;
+
+PYBIND11_DECLARE_HOLDER_TYPE(T, cinn::common::Shared<T>);
 
 namespace cinn::pybind {
 using ir::IrNode;
@@ -571,7 +574,10 @@ void BindIrIr(py::module *m) {
       .def_static(
           "make",
           py::overload_cast<const std::string &, Type>(&ir::_Buffer_::Make))
-      .def_static("make", py::overload_cast<>(&ir::_Buffer_::Make));
+      .def_static(
+          "make",
+          py::overload_cast<const std::string &, const std::vector<Expr> &>(
+              &ir::_Buffer_::Make));
 
   py::class_<ir::ModuleExpr> module_expr(*m, "ModuleExpr");
   module_expr.def(py::init<const std::vector<Expr> &>());
@@ -809,23 +815,42 @@ void BindIrContext(py::module *m) {
   using ir::Var;
   using py::arg;
 
+  // py::class_<IRContextNode, common::Shared<IRContextNode>> ir_ctx_node(*m, "IRContextNode");
+  py::class_<IRContext> ir_ctx(*m, "IRContext");
+  // py::class_<IRContextNode, IRContext> xx(*m, "xxxy");
+
   py::class_<IRBuilder> ir_builder(*m, "IRBuilder");
   ir_builder.def(py::init<>())
       .def("EnterWithContext", &IRBuilder::EnterWithContext)
       .def("ExitWithContext", &IRBuilder::ExitWithContext)
-      .def("get", [](IRBuilder&self) {
-          return self->Get();
+      .def("get", [](IRBuilder &self) { return self->Get(); });
+
+  py::class_<ScheduleBlockContextNode> sch_block_ctx(*m,
+                                                     "ScheduleBlockContext");
+  sch_block_ctx.def(py::init<>())
+      .def("EnterWithContext", &ScheduleBlockContextNode::EnterWithContext)
+      .def("ExitWithContext", &ScheduleBlockContextNode::ExitWithContext);
+
+  py::class_<LowerFuncContext> lower_func_ctx(*m, "LowerFuncContext");
+  lower_func_ctx.def(py::init<LowerFuncContextNode *>())
+      .def("EnterWithContext",
+           [](LowerFuncContext &self) {
+             return self.As<LowerFuncContextNode>()->EnterWithContext();
+           })
+      .def("ExitWithContext", [](LowerFuncContext &self) {
+        VLOG(-1) << "exit";
+        return self.As<LowerFuncContextNode>()->ExitWithContext();
       });
 
-  py::class_<ScheduleBlockContextNode> sch_block_ctx(*m, "ScheduleBlockContextNode");
-  sch_block_ctx.def(py::init<>())
-    .def("EnterWithContext", &ScheduleBlockContextNode::EnterWithContext)
-    .def("ExitWithContext", &ScheduleBlockContextNode::ExitWithContext);
-
+  py::class_<LowerFuncContextNode> lower_func_ctx_node(*m,
+                                                       "LowerFuncContextNode");
+  lower_func_ctx_node.def(py::init<>()).def(py::init<std::string>());
   m->def("AxisMap", &AxisMap);
   m->def("TensorStore", &TensorStore);
+  m->def("Arg", py::overload_cast<std::string, Var>(&Arg));
+  m->def("Arg", py::overload_cast<std::string, ir::Buffer>(&Arg));
+  m->def("Sequential", py::overload_cast<Expr, Expr>(&Sequential));
 }
-
 }  // namespace
 
 void BindIr(py::module *m) {

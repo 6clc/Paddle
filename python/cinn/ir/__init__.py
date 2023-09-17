@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .ir_context import IRBuilder
+from .ir import sequential
+from .ir_context import IRBuilder, ScheduleBlockContext, LowerFuncContext
 from ..core_api.ir import (  # noqa: F401
     Add,
     And,
@@ -127,6 +128,8 @@ from ..core_api.ir import (  # noqa: F401
     ModuleExpr,
     IrCompare,
     IfThenElse,
+    Arg,
+    Sequential
 )
 
 

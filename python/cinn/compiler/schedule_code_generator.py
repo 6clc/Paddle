@@ -39,8 +39,7 @@ class ScheduleCodeGenerator(ast.NodeVisitor):
             return
 
         for sch_node in self.sch_seq:
-            block_name2loops = self.scheduler.get_name2loops_dict(
-                node.value.id)
+            block_name2loops = self.scheduler.get_name2loops_dict(node.value.id)
             for k, v in block_name2loops.items():
                 self.name2loops[k] = v
 

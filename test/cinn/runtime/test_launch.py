@@ -21,9 +21,10 @@ from cinn.runtime.data_array import DataArray
 
 @to_cinn_llir
 def bin_op_kernel(X, Y, Z, N):
-    for idx in range(N):
-        idx_1 = idx
-        Z[idx_1] = X[idx_1] + Y[idx_1]
+    pass
+    # for idx in range(10):
+    # idx_1 = idx
+    # Z[idx_1] = X[idx_1] + Y[idx_1]
 
 
 def test_launch():
@@ -44,4 +45,10 @@ def test_launch():
 
 
 if __name__ == "__main__":
+    import os
+    import sys
+    print(sys.version)
+    print(os.getpid())
+    os.system("read REPLY")
+
     test_launch()

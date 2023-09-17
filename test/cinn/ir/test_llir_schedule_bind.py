@@ -13,19 +13,15 @@
 # limitations under the License.
 
 
-import sys
-import cinn
-import numpy as np
+
+import cinn.schedule as sch
 from cinn import to_cinn_llir
 from cinn.runtime.data_array import DataArray
-import cinn.schedule as sch
 
 
 def test_bind_reduce():
-
     @to_cinn_llir
     def reduce_sum(A: DataArray((1, 4, 256, 512)), B: DataArray((1, 4, 256))):
-
         for i1 in range(1):
             for j1 in range(4):
                 for k1 in range(256):
@@ -38,8 +34,9 @@ def test_bind_reduce():
                         sch.bind(k1, "threadIdx.x")
                         vi1, vj1, vk1, vl1 = i1, j1, k1, l1
                         vl1.is_reduce_axis = True
-                        B[vi1, vj1, vk1] = B[vi1, vj1, vk1] + \
-                            A[vi1, vj1, vk1, vl1]
+                        B[vi1, vj1, vk1] = (
+                            B[vi1, vj1, vk1] + A[vi1, vj1, vk1, vl1]
+                        )
 
     print(reduce_sum)
 

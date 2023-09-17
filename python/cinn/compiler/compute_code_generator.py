@@ -18,7 +18,8 @@ from typing import List, Union
 from cinn import ir
 from cinn.runtime.data_array import DataArray
 
-from .utils import node_is_schedule
+from .utils import node_is_schedule, VariableTable
+from .expr_executor import ExprExecutor
 
 
 class ComputeCodeGenerator(ast.NodeVisitor):
@@ -32,15 +33,19 @@ class ComputeCodeGenerator(ast.NodeVisitor):
         self.function_name = function_name
         self.inputs_signature = inputs_signature
         self.cinn_llir_func = None
-        self.variables_table = {}
+        self.variables_table = VariableTable()
         self.schedule_block_iter_var2expr = {}
         self.cur_schedule_block_name = ""
+        self.extra_scope = {"range": ir.sequential}
 
     def parse(self):
         ast_node = self.fn.parse()
-        with ir.IRBuilder() as builder:
-            print("hello world")
-            # self.visit(ast_node)
+        with ir.IRBuilder() as builder, self.variables_table:
+            for k, v in self.fn.scope.items():
+                self.variables_table.add(k, v)
+            for k, v in self.extra_scope.items():
+                self.variables_table.add(k, v)
+            self.visit(ast_node)
         return builder.get()
 
     def visit_FunctionDef(self, node) -> None:
@@ -50,64 +55,34 @@ class ComputeCodeGenerator(ast.NodeVisitor):
         Args:
             node(ast.FunctionDef): The ast FunctionDef Node
         """
-        arg_names = self.visit(node.args)
+        with ir.LowerFuncContext(self.function_name) as func_ctx:
+            arg_names = self.visit(node.args)
 
-        assert len(node.args.defaults) == 0, "Not support default args"
+            assert len(node.args.defaults) == 0, "Not support default args"
 
-        # 1. Construct args of function
-        llir_args = []
-        for i, arg_name in enumerate(arg_names):
-            # Obj of Argument is ir::Buffer
-            if hasattr(self.inputs_signature[i], "dtype"):
-                llir_value = ir._Buffer_.make(
-                    "_" + arg_name, self.inputs_signature[i].dtype
-                )
-                llir_args.append(
-                    ir.Argument(llir_value, ir.Argument.IO.kUnknown)
-                )
-                tensor_shape = [
-                    ir.Expr(dim) for dim in self.inputs_signature[i].shape
-                ]
+            # 1. Construct args of function
+            # TODO(6clc): Use the unified eval_expression to handle both var and buffer Arguments
+            for i, arg_name in enumerate(arg_names):
+                # Obj of Argument is ir::Buffer
+                if hasattr(self.inputs_signature[i], "dtype"):
+                    tensor_shape = [
+                        ir.Expr(dim) for dim in self.inputs_signature[i].shape
+                    ]
+                    llir_value = ir._Buffer_.make(
+                        arg_name, tensor_shape
+                    )
+                # Obj of Argument is ir::Var
+                else:
+                    llir_value = ir.Var(arg_name)
+                ir.Arg(arg_name, llir_value)
+                self.variables_table.add(arg_name, llir_value)
 
-                # The computational logic of CINN is implemented through Tensor,
-                # so ir::_Tensor_ is stored in local variables
-                llir_value = ir._Tensor_.make(
-                    arg_name,
-                    self.inputs_signature[i].dtype,
-                    tensor_shape,
-                    tensor_shape,
-                )
-            # Obj of Argument is ir::Var
-            else:
-                llir_value = ir.Var(arg_name)
-                llir_args.append(ir.Argument(llir_value))
-                # The computational logic of CINN is implemented through Expr<Var>,
-                # so ir::Expr is stored in local variables
-                llir_value = ir.Expr(llir_value)
-            self.set_value(arg_name, llir_value)
-
-        # 2. Construct body of function
-        body = self.visit_compound_statement(node.body)
-        body = ir.ScheduleBlockRealize.make(
-            [], ir.ScheduleBlock.make([], [], [], "root", body)
-        )
-        body = ir.Block.make([body])
-
-        # 3. Construct LoweredFunc
-        self.cinn_llir_func = ir.LoweredFunc.make(
-            self.function_name, llir_args, body
-        )
+            # 2. Construct body of function
+            body = self.visit_compound_statement(node.body)
 
     def visit_compound_statement(self, stmts):
-        cinn_stmts = []
         for stmt in stmts:
-            cinn_stmt = self.visit(stmt)
-            assert cinn_stmt is not None, f"Unsupport parse:\n{stmt}"
-            # Some situations do not require conversion to CINN IR
-            if str(cinn_stmt) in ["no compute"]:
-                continue
-            cinn_stmts.append(cinn_stmt)
-        return ir.Block.make(cinn_stmts)
+            self.visit(stmt)
 
     def visit_arguments(self, node):
         """
@@ -159,34 +134,13 @@ class ComputeCodeGenerator(ast.NodeVisitor):
 
         Args:
             node(ast.For): The ast For node
-
-        Returns:
-            ir.Expr, Points to the Expr of ir::ExprNode<For>
         """
-        # 1. Parse the iter of the For loop
-        iter_args = [self.visit(arg) for arg in node.iter.args]
-        assert (
-            len(iter_args) <= 2
-        ), "CINN Low Level IR does not support setting the range step"
-        ast_min = iter_args[0] if len(
-            iter_args) > 1 else self.visit(ast.Num(0))
-        ast_extent = iter_args[1] if len(iter_args) > 1 else iter_args[0]
-
-        # TODO(6clc): support sub region's local variable
-        # AS code in  `visit_FunctionDef`, store  ir::Expr in local variables
-        llir_var = ir.Var(node.target.id)
-        llir_var_expr = ir.Expr(llir_var)
-        self.set_value(node.target.id, llir_var_expr)
-
-        llir_for_min = ir.Expr(ast_min)
-        llir_for_extent = ir.Expr(ast_extent)
-
-        # 2. Parse the body of the For loop
-        llir_for_body = self.visit_compound_statement(node.body)
-        for_expr = ir.For.make(
-            llir_var, llir_for_min, llir_for_extent, llir_for_body
-        )
-        return for_expr
+        for_ctx = ExprExecutor(self.variables_table.get()).exec(node.iter)
+        with self.variables_table:
+            with for_ctx:
+                pass
+                # self.eval_assign(target=node.target, source=iters)
+                # self.visit_compound_statement(node.body)
 
     def visit_Name(self, node):
         # Store Node
@@ -252,7 +206,9 @@ class ComputeCodeGenerator(ast.NodeVisitor):
                     list(self.schedule_block_iter_var2expr.keys()),
                     [],
                     [],
-                    lhs.value.id if self.cur_schedule_block_name == "" else self.cur_schedule_block_name,
+                    lhs.value.id
+                    if self.cur_schedule_block_name == ""
+                    else self.cur_schedule_block_name,
                     tensor_body,
                 ),
             )
@@ -344,7 +300,7 @@ class ComputeCodeGenerator(ast.NodeVisitor):
 
     def visit_With(self, node):
         for item in node.items:
-            frame = self.eval_expr(item.context_expr)
+            frame = sel.eval_expr(item.context_expr)
             rhs = frame
             if item.optional_vars is not None:
                 self.eval_assign(target=item.optional_vars, source=rhs)

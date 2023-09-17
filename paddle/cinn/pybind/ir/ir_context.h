@@ -1,3 +1,17 @@
+// Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #pragma once
 #include <map>
 #include <vector>
@@ -6,13 +20,14 @@
 #include "paddle/cinn/common/type.h"
 #include "paddle/cinn/ir/ir.h"
 #include "paddle/cinn/ir/ir_base.h"
+#include "paddle/cinn/ir/lowered_func.h"
 
 namespace cinn {
 namespace pybind {
 
 class IRContextNode : public common::Object {
  public:
-  std::vector<Expr> exprs;
+  std::vector<ir::Expr> exprs;
 
  public:
   virtual void EnterWithContext();
@@ -23,25 +38,41 @@ class IRContextNode : public common::Object {
   static constexpr char* __type_info__ = "IRContextNode";
 };
 
-class IRContext : public common::Shared<IRContextNode> {
+class IRContext {
  public:
   IRContext() = default;
-  IRContext(const IRContext& other) : Shared(other.p_) {}
-  explicit IRContext(IRContextNode* x) : Shared(x) {}
+  IRContext(const IRContext& other) = default;
+  explicit IRContext(IRContextNode* x) : data_(x) {}
 
+  const IRContextNode* get() const { return data_.get(); }
+  const IRContextNode* operator->() const { return data_.get(); }
+
+  void add_expr(Expr expr) { data_->exprs.push_back(expr); }
+
+ protected:
+  common::Shared<IRContextNode> data_;
+
+ public:
   template <typename TIRContextNode>
   const TIRContextNode* As() const {
     static_assert(std::is_base_of<IRContextNode, TIRContextNode>());
-    CHECK(get()) << "IrContext holds null";
-    if (get()->type_info() == TIRContextNode::type_info())
-      return static_cast<const TIRContextNode*>(get());
-    return nullptr;
+    CHECK(data_.get()) << "IrContext holds null";
+    auto* ctx_node = data_.get()->safe_as<TIRContextNode>();
+    if (!ctx_node) {
+      LOG(FATAL) << "TypeConvertError: convert " << data_.get()->type_info()
+                 << " to " << TIRContextNode::__type_info__;
+    }
+    return ctx_node;
   }
   template <typename TIRContextNode>
   TIRContextNode* As() {
-    if (get()->type_info() == TIRContextNode::__type_info__)
-      return static_cast<TIRContextNode*>(get());
-    return nullptr;
+    CHECK(data_.get()) << "IrContext holds null";
+    auto* ctx_node = data_.get()->safe_as<TIRContextNode>();
+    if (!ctx_node) {
+      LOG(FATAL) << "TypeConvertError: convert " << data_.get()->type_info()
+                 << " to " << TIRContextNode::__type_info__;
+    }
+    return ctx_node;
   }
 };
 
@@ -71,6 +102,11 @@ class ScheduleBlockContextNode : public IRContextNode {
   static constexpr const char* __type_info__ = "ScheduleBlockContextNode";
 };
 
+class ScheduleBlockContext : public IRContext {
+ public:
+  ScheduleBlockContext(ScheduleBlockContextNode* x) : IRContext(x) {}
+};
+
 class ForContextNode : public IRContextNode {
  public:
   //! The loop variable.
@@ -88,6 +124,33 @@ class ForContextNode : public IRContextNode {
   static constexpr const char* __type_info__ = "ForContextNode";
 };
 
+class ForContext : public IRContext {
+ public:
+  explicit ForContext(ForContextNode* x) : IRContext(x) {}
+};
+
+class LowerFuncContextNode : public IRContextNode {
+ public:
+  //! The name of this function.
+  std::string name;
+  //! The Arguments used in the body of the function.
+  std::vector<ir::Argument> args;
+
+ public:
+  LowerFuncContextNode() = default;
+  LowerFuncContextNode(std::string name) : name(name) {}
+  void ExitWithContext() final;
+  const char* type_info() const override { return __type_info__; }
+
+ public:
+  static constexpr const char* __type_info__ = "LowerFuncContextNode";
+};
+
+class LowerFuncContext : public IRContext {
+ public:
+  explicit LowerFuncContext(LowerFuncContextNode* x) : IRContext(x) {}
+};
+
 class IRBuilderNode : public common::Object {
  public:
   std::vector<IRContext> contexts;
@@ -96,13 +159,10 @@ class IRBuilderNode : public common::Object {
   Expr Get() const;
 
   template <typename TIRContextNode>
-  IRContext GetLastContext() const {
-    if (TIRContextNode::__type_info__ != contexts.back().get()->type_info()) {
-      LOG(FATAL) << "TypeError: The last context is not "
-                 << TIRContextNode::__type_info__;
-    }
-    return contexts.back();
-  }
+  IRContext GetLastContext() const;
+
+  template <typename TIRContextNode>
+  IRContext FindContext() const;
 
  public:
   static constexpr const char* __type_info__ = "IRBuilderNode";
@@ -117,6 +177,24 @@ class IRBuilder : public common::Shared<IRBuilderNode> {
 
 std::vector<IRBuilder>* IRBuilderStack();
 void LinkToParentContext(ir::Expr);
+
+template <typename TIRContextNode>
+IRContext IRBuilderNode::GetLastContext() const {
+  if (!(contexts.back().As<TIRContextNode>())) {
+    LOG(FATAL) << "TypeError: The last context is not "
+               << TIRContextNode::__type_info__;
+  }
+  return contexts.back();
+}
+
+template <typename TIRContextNode>
+IRContext IRBuilderNode::FindContext() const {
+  for (auto it = contexts.rbegin(); it != contexts.rend(); ++it) {
+    if (const TIRContextNode* p = it->As<TIRContextNode>()) {
+      return *it;
+    }
+  }
+}
 
 }  // namespace pybind
 

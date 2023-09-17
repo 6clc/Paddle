@@ -12,6 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import ast
+try:
+    from _collections import defaultdict
+except ImportError:
+    pass
+
 
 from cinn.schedule import IRSchedule
 
@@ -24,3 +29,27 @@ def node_is_schedule(node: ast.Call):
         func_name = node.func.attr
 
     return getattr(IRSchedule, func_name, None)
+
+
+class VariableTable:
+    def __init__(self):
+        self.var_name_list = []
+        self.name2value = defaultdict(list)
+
+    def __enter__(self):
+        self.var_name_list.append([])
+        return self
+
+    def __exit__(self, ptype, value, trace) -> None:
+        if ptype is None and value is None:
+            var_names = self.var_name_list.pop()
+            for var_name in var_names:
+                self.name2value.pop(var_name)
+
+    def add(self, name, value):
+        # TODO(6clc): to check value is equal
+        self.var_name_list[-1].append(name)
+        self.name2value[name].append(value)
+
+    def get(self):
+        return {k: v[-1] for k, v in self.name2value.items()}

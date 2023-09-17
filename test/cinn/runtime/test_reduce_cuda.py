@@ -13,17 +13,16 @@
 # limitations under the License.
 
 
-import sys
+
 import cinn
+import cinn.schedule as sch
 import numpy as np
 from cinn import to_cinn_llir
 from cinn.runtime.data_array import DataArray
-import cinn.schedule as sch
 
 
 @to_cinn_llir
 def reduce_sum(A, B):
-
     for i1 in range(1):
         for j1 in range(2):
             for k1 in range(4):

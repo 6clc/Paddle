@@ -28,9 +28,7 @@ def ast_to_llir(fn, inputs_signature):
     cinn_llir_func = llir_compute_generator.parse()
 
     # 2. Parse CINN Schedule
-    llir_schedule_generator = ScheduleCodeGenerator(
-        cinn_llir_func
-    )
+    llir_schedule_generator = ScheduleCodeGenerator(cinn_llir_func)
     llir_schedule_generator.visit(fn.parse())
     return llir_schedule_generator.cinn_llir_func
 
@@ -46,8 +44,7 @@ def compile(fn, just_convert=False, jit_inputs_signature=[], **kwargs):
     if isinstance(fn, CinnLowerLevelIrJit):
         llir_func = ast_to_llir(fn, jit_inputs_signature)
     else:
-        raise Exception(
-            "Current Only support compile from CinnLowerLevelIrJit")
+        raise Exception("Current Only support compile from CinnLowerLevelIrJit")
 
     if just_convert:
         return llir_func

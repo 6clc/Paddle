@@ -18,6 +18,7 @@ import functools
 import inspect
 import textwrap
 from typing import Callable, Generic, Optional, TypeVar, Union, cast
+from .utils import inspect_function_scope
 
 T = TypeVar('T')
 
@@ -30,7 +31,8 @@ class CinnLowerLevelIrJit(Generic[T]):
         self.arg_names = [v.name for v in signature.parameters.values()]
 
         self.src = textwrap.dedent(inspect.getsource(fn))
-        self.src = self.src[self.src.find("def") :]
+        self.src = self.src[self.src.find("def"):]
+        self.scope = inspect_function_scope(fn)
 
         # docs of warpped function
         self.__doc__ = fn.__doc__
