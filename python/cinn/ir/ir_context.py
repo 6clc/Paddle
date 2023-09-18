@@ -31,7 +31,7 @@ class IRBuilder:
             self.ir_builder.ExitWithContext()
 
     def get(self):
-        return self.ir_builder.get()
+        return self.ir_builder.get_result()
 
 
 class IRContext:
@@ -73,7 +73,13 @@ class LowerFuncContext(object):
             self.ir_ctx.ExitWithContext()
 
 
-class ForContext(IRContext):
+class ForContext(object):
     def __init__(self, min, extent):
-        for_ctx = ir.Sequential(min, extent)
-        super().__init__(for_ctx)
+        self.ir_ctx = ir.Sequential(min, extent)
+    def __enter__(self):
+        self.ir_ctx.EnterWithContext()
+        return self.ir_ctx.get_for_loop_var()
+
+    def __exit__(self, ptype, value, trace) -> None:
+        if ptype is None and value is None:
+            self.ir_ctx.ExitWithContext()

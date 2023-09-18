@@ -496,6 +496,7 @@ void BindIrIr(py::module *m) {
       .def(py::init<Expr, Expr, const std::string &>())
       .def(py::init<int, const std::string &>())
       .def(py::init<Expr, const std::string &>())
+      .def("rename", [](Var &self, std::string &name) { self->name = name; })
       .def("get_mutable",
            py::overload_cast<>(&Var::get),
            py::return_value_policy::reference)
@@ -640,6 +641,17 @@ void BindIrTensor(py::module *m) {
              return self(a, b, c);
            })
       .def("__call__",
+           [](ir::Tensor &self, Expr a, Expr b, Expr c, Expr d) {
+             return self(a, b, c, d);
+           })
+      .def("__getitem__", [](ir::Tensor &self, Expr a) { return self(a); })
+      .def("__getitem__",
+           [](ir::Tensor &self, Expr a, Expr b) { return self(a, b); })
+      .def("__getitem__",
+           [](ir::Tensor &self, Expr a, Expr b, Expr c) {
+             return self(a, b, c);
+           })
+      .def("__getitem__",
            [](ir::Tensor &self, Expr a, Expr b, Expr c, Expr d) {
              return self(a, b, c, d);
            })
@@ -815,15 +827,23 @@ void BindIrContext(py::module *m) {
   using ir::Var;
   using py::arg;
 
-  // py::class_<IRContextNode, common::Shared<IRContextNode>> ir_ctx_node(*m, "IRContextNode");
   py::class_<IRContext> ir_ctx(*m, "IRContext");
-  // py::class_<IRContextNode, IRContext> xx(*m, "xxxy");
+  ir_ctx.def(py::init<>())
+      .def("EnterWithContext",
+           [](IRContext &self) { self.data_->EnterWithContext(); })
+      .def("ExitWithContext",
+           [](IRContext &self) { self.data_->ExitWithContext(); })
+      .def("get_for_loop_var", [](IRContext &self) {
+        return self.data_->safe_as<ForContextNode>()->loop_var;
+      });
 
   py::class_<IRBuilder> ir_builder(*m, "IRBuilder");
   ir_builder.def(py::init<>())
       .def("EnterWithContext", &IRBuilder::EnterWithContext)
       .def("ExitWithContext", &IRBuilder::ExitWithContext)
-      .def("get", [](IRBuilder &self) { return self->Get(); });
+      .def("get_result", [](IRBuilder &self) {
+        return self.data_->GetResult().as_lowered_func_ref();
+      });
 
   py::class_<ScheduleBlockContextNode> sch_block_ctx(*m,
                                                      "ScheduleBlockContext");
@@ -838,7 +858,6 @@ void BindIrContext(py::module *m) {
              return self.As<LowerFuncContextNode>()->EnterWithContext();
            })
       .def("ExitWithContext", [](LowerFuncContext &self) {
-        VLOG(-1) << "exit";
         return self.As<LowerFuncContextNode>()->ExitWithContext();
       });
 

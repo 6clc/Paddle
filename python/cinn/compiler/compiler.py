@@ -48,6 +48,7 @@ def compile(fn, just_convert=False, jit_inputs_signature=[], **kwargs):
 
     if just_convert:
         return llir_func
+    print(llir_func)
 
     rt_module = llir_to_runtime_module(
         llir_func, kwargs["target"], fn.__name__, kwargs["arg_names"]

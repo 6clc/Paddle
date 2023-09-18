@@ -30,7 +30,7 @@ std::vector<Var> AxisMap(std::string kinds, std::vector<Expr> iter_expression) {
 }
 Var SetScheduleBlockIterVar(Var iter_var, Expr expr) {
   IRContext cur_context =
-      IRBuilder::CurrentIRBuilder()->GetLastContext<ScheduleBlockContextNode>();
+      IRBuilder::CurrentIRBuilder().data_->GetLastContext<ScheduleBlockContextNode>();
   ScheduleBlockContextNode* cur_context_node =
       cur_context.As<ScheduleBlockContextNode>();
   cur_context_node->iter_vars.push_back(iter_var);
@@ -40,7 +40,7 @@ Var SetScheduleBlockIterVar(Var iter_var, Expr expr) {
 
 Expr Arg(std::string name, Var var) {
   IRContext ctx =
-      IRBuilder::CurrentIRBuilder()->FindContext<LowerFuncContextNode>();
+      IRBuilder::CurrentIRBuilder().data_->FindContext<LowerFuncContextNode>();
   var->name = name;
   ctx.As<LowerFuncContextNode>()->args.emplace_back(var,
                                                     ir::Argument::IO::kUnknown);
@@ -49,7 +49,7 @@ Expr Arg(std::string name, Var var) {
 
 Expr Arg(std::string name, ir::Buffer buffer) {
   IRContext ctx =
-      IRBuilder::CurrentIRBuilder()->FindContext<LowerFuncContextNode>();
+      IRBuilder::CurrentIRBuilder().data_->FindContext<LowerFuncContextNode>();
   buffer->name = "_" + name;
   // TODO(6clc): Unify cinn compilation and runtime Type,
   //  and add a Handle type to Var

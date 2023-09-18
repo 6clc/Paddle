@@ -129,7 +129,8 @@ from ..core_api.ir import (  # noqa: F401
     IrCompare,
     IfThenElse,
     Arg,
-    Sequential
+    Sequential,
+    TensorStore
 )
 
 

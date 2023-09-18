@@ -49,7 +49,7 @@ class IRContext {
 
   void add_expr(Expr expr) { data_->exprs.push_back(expr); }
 
- protected:
+ public:
   common::Shared<IRContextNode> data_;
 
  public:
@@ -156,7 +156,8 @@ class IRBuilderNode : public common::Object {
   std::vector<IRContext> contexts;
   Expr result;
   const char* type_info() const override { return __type_info__; }
-  Expr Get() const;
+  Expr GetResult() const;
+  void Reset();
 
   template <typename TIRContextNode>
   IRContext GetLastContext() const;
@@ -167,12 +168,15 @@ class IRBuilderNode : public common::Object {
  public:
   static constexpr const char* __type_info__ = "IRBuilderNode";
 };
-class IRBuilder : public common::Shared<IRBuilderNode> {
+class IRBuilder {
  public:
   IRBuilder();
   void EnterWithContext();
   void ExitWithContext();
   static IRBuilder CurrentIRBuilder();
+
+ public:
+  common::Shared<IRBuilderNode> data_;
 };
 
 std::vector<IRBuilder>* IRBuilderStack();

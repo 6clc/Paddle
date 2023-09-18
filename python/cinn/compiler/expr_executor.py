@@ -1,14 +1,38 @@
-
+from cinn import ir
 import ast
 
 
+AST2CINN ={
+            ast.Add: ir.Add,
+            ast.Sub: ir.Sub,
+            ast.Mult: ir.Mul,
+            ast.Div: ir.Div,
+            ast.Mod: ir.Mod,
+            ast.And: ir.And,
+            ast.Or: ir.Or,
+            ast.USub: ir.Minus,
+            ast.Not: ir.Not,
+            ast.Eq: ir.EQ,
+            ast.NotEq: ir.NE,
+            ast.Lt: ir.LT,
+            ast.LtE: ir.LE,
+            ast.Gt: ir.GT,
+            ast.GtE: ir.GE,
+
+
+}
 class ExprExecutor(object):
     def __init__(self, var_table):
         self.var_table = var_table
+        self.tmp_value_count= 1
 
     def exec(self, node):
         ret = self.visit(node)
-        return ret
+        if isinstance(ret, ast.Name):
+            return  self.var_table[ret.id]
+        if isinstance(ret, ret.Constant):
+            return ret.value
+        raise Exception(f"Error result type: {type(ret)}")
 
     def visit(self, node):
         if isinstance(node, list):
@@ -22,6 +46,9 @@ class ExprExecutor(object):
         if isinstance(node, ast.Constant):
             return node
 
+        if not isinstance(node, (ast.expr, ast.slice)):
+            # some nodes don't need to parse, such as ast.Load
+            return node
         if isinstance(node, (ast.Lambda, ast.Starred)):
             raise Exception("Current not suporrted: Lambda, Starred")
 
@@ -36,18 +63,61 @@ class ExprExecutor(object):
         node_type_name = f'eval_{type(node).__name__}'
         if hasattr(self, node_type_name):
             exec_func = getattr(self, node_type_name)
-            exec_func(cls_fields)
+            value = exec_func(cls_fields)
         else:
             new_node = node.__class__(**cls_fields)
             ast.copy_location(new_node, node)
             new_node = ast.Expression(new_node)
-            self.exec_expr(new_node)
-            # self.exec_expr(node.__class__(**cls_fields))
+            value = self.exec_expr(new_node)
+        return self.save_temp_value(value)
 
     def exec_expr(self, node):
-        # if isinstance(node, ast.expr):
-        #     node = ast.Expression(body=node)
-        # assert isinstance(node, ast.Expression)
-        # node = ast.fix_missing_locations(node)
+        if isinstance(node, ast.expr):
+            node = ast.Expression(body=node)
+        node = ast.fix_missing_locations(node)
         exec = compile(node, filename="<ast>", mode="eval")
         return eval(exec, self.var_table)
+
+    def eval_BinOp(self, fields):
+        args = [self.exec_expr(fields["left"]),
+                self.exec_expr(fields["right"])]
+        return AST2CINN[type(fields["op"])].make(*args)
+
+
+    def save_temp_value(self, value):
+        name = f"__cinn_python_script_tmp_value_{self.tmp_value_count}"
+        self.tmp_value_count += 1
+        self.var_table[name ] = value
+        return ast.Name(
+            id = name,
+            ctx = ast.Load(
+                lineno = 0,
+                col_offset = 0,
+                end_lineno = None,
+                end_col_offset = None
+            ),
+            lineno = 0,
+            col_offset = 0,
+            end_lineno = None,
+            end_col_offset = None,
+        )
+
+
+def exec_assign(target , source):
+    right_value_var_name = "__CINN_RIGHT_VALUE_VAR_NAME__"
+    local_var_table = {right_value_var_name: source}
+    mod = ast.fix_missing_locations(
+        ast.Module(
+            body=[ast.Assign(
+                targets=[target],
+                value = ast.Name(
+                    id = right_value_var_name,
+                    ctx = ast.Load())
+            )],
+                  type_ignores=[]
+        )
+    )
+    exe = compile(mod, filename="<ast>", mode="exec")
+    exec(exe, {}, local_var_table)
+    del local_var_table[right_value_var_name]
+    return local_var_table

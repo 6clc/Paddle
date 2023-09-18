@@ -18,12 +18,10 @@
 namespace cinn {
 namespace pybind {
 void IRContextNode::EnterWithContext() {
-  VLOG(-2) << this->__ref_count__.to_string();
-  IRBuilder::CurrentIRBuilder()->contexts.emplace_back(this);
-  VLOG(-2) << this->__ref_count__.to_string();
+  IRBuilder::CurrentIRBuilder().data_->contexts.emplace_back(this);
 }
 void IRContextNode::ExitWithContext() {
-  IRBuilder::CurrentIRBuilder()->contexts.pop_back();
+  IRBuilder::CurrentIRBuilder().data_->contexts.pop_back();
 }
 
 void ScheduleBlockContextNode::ExitWithContext() {
@@ -49,40 +47,38 @@ void LowerFuncContextNode::ExitWithContext() {
   ir::LoweredFunc lower_func =
       ir::_LoweredFunc_::Make(name, args, ir::Block::Make(exprs));
   IRBuilder ir_builder = IRBuilder::CurrentIRBuilder();
-  ir_builder->result = lower_func.operator Expr();
+  ir_builder.data_->result = lower_func.operator Expr();
 }
 
-Expr IRBuilderNode::Get() const {
+Expr IRBuilderNode::GetResult() const {
   CHECK(result.defined()) << "No result generated in IRBuilder";
   return result;
 }
 
+ void IRBuilderNode::Reset(){
+   contexts.clear();
+   result.Reset();
+ }
+
 IRBuilder::IRBuilder() {
   common::Shared<IRBuilderNode> n(new IRBuilderNode());
-  p_ = n.get();
-  p_->contexts.clear();
-  p_->result.Reset();
-  VLOG(-2) << p_->__ref_count__.to_string();
+  n->Reset();
+  data_ = n;
 }
 
 void IRBuilder::EnterWithContext() {
-  IRBuilderNode* node = this->get();
-  CHECK(node->contexts.empty())
+  CHECK(data_->contexts.empty())
       << "There are still Contexts in IRBuilder that has not been fully converted. \
                                     Please build a new IR with the new IRbuilder";
-  node->result.Reset();
-  VLOG(-2) << p_->__ref_count__.to_string();
+  data_->result.Reset();
   std::vector<IRBuilder>* st = IRBuilderStack();
   st->push_back(*this);
-  VLOG(-2) << p_->__ref_count__.to_string();
 }
 
 void IRBuilder::ExitWithContext() {
-  VLOG(-2) << p_->__ref_count__.to_string();
   std::vector<IRBuilder>* st = IRBuilderStack();
   CHECK(!st->empty());
   st->pop_back();
-  VLOG(-2) << p_->__ref_count__.to_string();
 }
 IRBuilder IRBuilder::CurrentIRBuilder() {
   std::vector<IRBuilder>* st = IRBuilderStack();
@@ -95,10 +91,10 @@ std::vector<IRBuilder>* IRBuilderStack() {
 }
 void LinkToParentContext(ir::Expr expr) {
   IRBuilder ir_builder = IRBuilder::CurrentIRBuilder();
-  if (ir_builder->contexts.empty()) {
-    ir_builder->result = expr;
+  if (ir_builder.data_->contexts.empty()) {
+    ir_builder.data_->result = expr;
   } else {
-    IRContext ir_context = ir_builder->contexts.back();
+    IRContext ir_context = ir_builder.data_->contexts.back();
     ir_context.add_expr(expr);
   }
 }

@@ -19,7 +19,7 @@ from cinn import ir
 from cinn.runtime.data_array import DataArray
 
 from .utils import node_is_schedule, VariableTable
-from .expr_executor import ExprExecutor
+from .expr_executor import ExprExecutor, exec_assign
 
 
 class ComputeCodeGenerator(ast.NodeVisitor):
@@ -61,21 +61,30 @@ class ComputeCodeGenerator(ast.NodeVisitor):
             assert len(node.args.defaults) == 0, "Not support default args"
 
             # 1. Construct args of function
-            # TODO(6clc): Use the unified eval_expression to handle both var and buffer Arguments
             for i, arg_name in enumerate(arg_names):
                 # Obj of Argument is ir::Buffer
                 if hasattr(self.inputs_signature[i], "dtype"):
                     tensor_shape = [
                         ir.Expr(dim) for dim in self.inputs_signature[i].shape
                     ]
+                    # TODO(6clc): unify Tensor and Buffer
                     llir_value = ir._Buffer_.make(
                         arg_name, tensor_shape
                     )
+                    ir.Arg(arg_name, llir_value)
+                    llir_value = ir._Tensor_.make(
+                        arg_name,
+                        self.inputs_signature[i].dtype,
+                        tensor_shape,
+                        tensor_shape,
+                    )
+                    self.variables_table.add(arg_name, llir_value)
                 # Obj of Argument is ir::Var
                 else:
                     llir_value = ir.Var(arg_name)
-                ir.Arg(arg_name, llir_value)
-                self.variables_table.add(arg_name, llir_value)
+                    ir.Arg(arg_name, llir_value)
+                    llir_value = ir.Expr(llir_value)
+                    self.variables_table.add(arg_name, llir_value)
 
             # 2. Construct body of function
             body = self.visit_compound_statement(node.body)
@@ -137,10 +146,12 @@ class ComputeCodeGenerator(ast.NodeVisitor):
         """
         for_ctx = ExprExecutor(self.variables_table.get()).exec(node.iter)
         with self.variables_table:
-            with for_ctx:
-                pass
-                # self.eval_assign(target=node.target, source=iters)
-                # self.visit_compound_statement(node.body)
+            with for_ctx as loop_var:
+                local_var_table = exec_assign(target=node.target, source=loop_var)
+                for k, v in local_var_table.items():
+                    loop_var.rename(k)
+                    self.variables_table.add(k, ir.Expr(v))
+                self.visit_compound_statement(node.body)
 
     def visit_Name(self, node):
         # Store Node
@@ -192,28 +203,19 @@ class ComputeCodeGenerator(ast.NodeVisitor):
         lhs = node.targets[0]
 
         # 1 parse RHS
-        rhs_expr = self.visit(node.value)
+        rhs_expr = ExprExecutor(self.variables_table.get()).exec(node.value)
 
         # 2 parse LHS
-        # 2.1 ScheduleBlockRealize
+        # 2.1 Tensor
         if isinstance(lhs, ast.Subscript):
-            expr_tensor, expr_indices = self.visit(lhs)
-
-            tensor_body = ir.Store.make(expr_tensor, rhs_expr, expr_indices)
-            schedule_block = ir.ScheduleBlockRealize.make(
-                list(self.schedule_block_iter_var2expr.values()),
-                ir.ScheduleBlock.make(
-                    list(self.schedule_block_iter_var2expr.keys()),
-                    [],
-                    [],
-                    lhs.value.id
-                    if self.cur_schedule_block_name == ""
-                    else self.cur_schedule_block_name,
-                    tensor_body,
-                ),
-            )
-            self.schedule_block_iter_var2expr = {}
-            return schedule_block
+            expr_tensor = ExprExecutor(self.variables_table.get()).exec(lhs.value)
+            if isinstance(lhs.slice, ast.Tuple):
+                expr_indices = []
+                for idx in lhs.slice.elts:
+                    expr_indices.append(ExprExecutor(self.variables_table.get()).exec(idx))
+            else:
+                expr_indices = [ExprExecutor(self.variables_table.get()).exec(lhs.slice)]
+            ir.TensorStore(expr_tensor.Expr(), rhs_expr, expr_indices)
         # 2.2 Attribute of Var
         elif isinstance(lhs, ast.Attribute):
             iter_var = self.visit(lhs.value)
