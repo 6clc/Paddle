@@ -20,13 +20,13 @@ from cinn.runtime.data_array import DataArray
 
 
 @to_cinn_llir
-def bin_op_kernel(X, Y, Z, N):
+def bin_op_kernel(X, Y, Z):
     for idx in range(10):
         Z[idx] = X[idx] + Y[idx]
 
 
 def test_launch():
-    N = 32
+    N = 10
     X_np = np.random.random(N).astype(np.float32)
     Y_np = np.random.random(N).astype(np.float32)
     Z_np = np.zeros((N), dtype=np.float32)
@@ -36,7 +36,7 @@ def test_launch():
     Z = DataArray.from_numpy(Z_np, target)
 
     # compile and run
-    bin_op_kernel[target](X, Y, Z, N)
+    bin_op_kernel[target](X, Y, Z)
     pred = Z.to_numpy()
     gt = np.add(X_np, Y_np)
     np.testing.assert_allclose(pred, gt)

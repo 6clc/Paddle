@@ -238,7 +238,7 @@ void Compiler::CompileCudaModule(const Module& module,
   auto _host_module_device_module_ = SplitCudaAndHostModule(module);  // NOLINT
   auto& host_module = std::get<0>(_host_module_device_module_);
   auto& device_module = std::get<1>(_host_module_device_module_);
-  VLOG(3) << "[CUDA] host module:\n" << host_module;
+  VLOG(-3) << "[CUDA] host module:\n" << host_module;
 
   VLOG(3) << "[CUDA] device module:\n" << device_module;
   std::string source_code;
@@ -251,7 +251,7 @@ void Compiler::CompileCudaModule(const Module& module,
   CHECK(!source_code.empty())
       << "Compile CUDA C code failed from device module:\n"
       << device_module;
-  VLOG(3) << "[CUDA] C:\n" << source_code;
+  VLOG(-3) << "[CUDA] C:\n" << source_code;
   SourceCodePrint::GetInstance()->write(source_code);
   using runtime::cuda::CUDAModule;
 

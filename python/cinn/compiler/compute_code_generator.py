@@ -69,7 +69,7 @@ class ComputeCodeGenerator(ast.NodeVisitor):
                     ]
                     # TODO(6clc): unify Tensor and Buffer
                     llir_value = ir._Buffer_.make(
-                        arg_name, tensor_shape
+                        arg_name, self.inputs_signature[i].dtype
                     )
                     ir.Arg(arg_name, llir_value)
                     llir_value = ir._Tensor_.make(
