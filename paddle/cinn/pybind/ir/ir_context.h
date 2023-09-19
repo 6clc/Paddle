@@ -124,10 +124,6 @@ class ForContextNode : public IRContextNode {
   static constexpr const char* __type_info__ = "ForContextNode";
 };
 
-class ForContext : public IRContext {
- public:
-  explicit ForContext(ForContextNode* x) : IRContext(x) {}
-};
 
 class LowerFuncContextNode : public IRContextNode {
  public:
@@ -146,10 +142,6 @@ class LowerFuncContextNode : public IRContextNode {
   static constexpr const char* __type_info__ = "LowerFuncContextNode";
 };
 
-class LowerFuncContext : public IRContext {
- public:
-  explicit LowerFuncContext(LowerFuncContextNode* x) : IRContext(x) {}
-};
 
 class IRBuilderNode : public common::Object {
  public:

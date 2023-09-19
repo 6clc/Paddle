@@ -34,8 +34,6 @@ class ComputeCodeGenerator(ast.NodeVisitor):
         self.inputs_signature = inputs_signature
         self.cinn_llir_func = None
         self.variables_table = VariableTable()
-        self.schedule_block_iter_var2expr = {}
-        self.cur_schedule_block_name = ""
         self.extra_scope = {"range": ir.sequential}
 
     def parse(self):
@@ -147,40 +145,12 @@ class ComputeCodeGenerator(ast.NodeVisitor):
         for_ctx = ExprExecutor(self.variables_table.get()).exec(node.iter)
         with self.variables_table:
             with for_ctx as loop_var:
-                local_var_table = exec_assign(target=node.target, source=loop_var)
+                local_var_table = exec_assign(
+                    target=node.target, source=loop_var)
                 for k, v in local_var_table.items():
                     loop_var.rename(k)
                     self.variables_table.add(k, ir.Expr(v))
                 self.visit_compound_statement(node.body)
-
-    def visit_Name(self, node):
-        # Store Node
-        if type(node.ctx) == ast.Store:
-            # ir::Tensor is not the same store as ir::Var.
-            # Let's hand it over to the call
-            return node.id
-        # Load Node
-        assert (
-            node.id in self.variables_table
-        ), f"{node.id} is not defined in context"
-        return self.variables_table[node.id]
-
-    def visit_Subscript(self, node):
-        expr_tensor = self.visit(node.value)
-        if isinstance(node.slice, (ast.List, ast.Tuple)):
-            indices = [self.visit(x) for x in node.slice.elts]
-        else:
-            indices = [self.visit(node.slice)]
-        if type(node.ctx) == ast.Load:
-            return ir.Load.make(expr_tensor, indices)
-        return expr_tensor, indices
-
-    def visit_Tuple(self, node):
-        args = [self.visit(x) for x in node.elts]
-        return args
-
-    def visit_Index(self, node):
-        return self.visit(node.value)
 
     def visit_Assign(self, node):
         """
@@ -208,13 +178,16 @@ class ComputeCodeGenerator(ast.NodeVisitor):
         # 2 parse LHS
         # 2.1 Tensor
         if isinstance(lhs, ast.Subscript):
-            expr_tensor = ExprExecutor(self.variables_table.get()).exec(lhs.value)
+            expr_tensor = ExprExecutor(
+                self.variables_table.get()).exec(lhs.value)
             if isinstance(lhs.slice, ast.Tuple):
                 expr_indices = []
                 for idx in lhs.slice.elts:
-                    expr_indices.append(ExprExecutor(self.variables_table.get()).exec(idx))
+                    expr_indices.append(ExprExecutor(
+                        self.variables_table.get()).exec(idx))
             else:
-                expr_indices = [ExprExecutor(self.variables_table.get()).exec(lhs.slice)]
+                expr_indices = [ExprExecutor(
+                    self.variables_table.get()).exec(lhs.slice)]
             ir.TensorStore(expr_tensor.Expr(), rhs_expr, expr_indices)
         # 2.2 Attribute of Var
         elif isinstance(lhs, ast.Attribute):
@@ -236,61 +209,10 @@ class ComputeCodeGenerator(ast.NodeVisitor):
 
             return "no compute"
 
-    def visit_Constant(self, node):
-        return ir.Expr(node.value)
-
-    def visit_With(self, node):
-        blocks = []
-        for ast_block in node.body:
-            blocks.append(self.visit(ast_block))
-        return ir.Block.make(blocks)
-
-    def visit_Expr(self, node):
-        return self.visit(node.value)
-
     def visit_Call(self, node):
         func_name = node.func.attr
         if node_is_schedule(node) is not None:
             return "no compute"
-
-    # visit Expressions
-    def visit_BinOp(self, node):
-        args = [self.visit(node.left), self.visit(node.right)]
-        ast2cinn = {
-            # Binary Op
-            ast.Add: ir.Add,
-            ast.Sub: ir.Sub,
-            ast.Mult: ir.Mul,
-            ast.Div: ir.Div,
-            ast.Mod: ir.Mod,
-            ast.And: ir.And,
-            ast.Or: ir.Or,
-        }
-        return ast2cinn[type(node.op)].make(*args)
-
-    def visit_UnaryOp(self, node):
-        args = [self.visit(node.operand)]
-        ast2cinn = {
-            ast.USub: ir.Minus,
-            ast.Not: ir.Not,
-        }
-        return ast2cinn[type(node.op)].make(*args)
-
-    def visit_Compare(self, node):
-        assert (
-            len(node.ops) == 1
-        ), "Only binary comparison symbols are supported. Expressions such as '1 <= a < 10' are not supported."
-        args = [node.left, *node.comparators]
-        args = [self.visit(item) for item in args]
-        ast2cinn = {
-            ast.Eq: ir.EQ,
-            ast.NotEq: ir.NE,
-            ast.Lt: ir.LT,
-            ast.LtE: ir.LE,
-            ast.Gt: ir.GT,
-            ast.GtE: ir.GE,
-        }
-        return ast2cinn[type(node.ops[0])].make(*args)
 
     def visit_If(self, node):
         condition_expr = self.visit(node.test)
@@ -308,19 +230,3 @@ class ComputeCodeGenerator(ast.NodeVisitor):
                 self.eval_assign(target=item.optional_vars, source=rhs)
         body = self.visit_compound_statement(node.body)
         return body
-
-    def set_value(self, name, value: Union[ir.Tensor, ir.Var]):
-        if isinstance(value, ir.Tensor):
-            value = value.Expr()
-        self.variables_table[name] = value
-
-    def eval(self, node):
-        return getattr(self, f'eval_{type(node).__name__}')(node)
-
-    def eval_Constant(self, node):
-        return self.eval_expression(node)
-
-    def eval_expression(self, node):
-        return eval(
-            compile(ast.Expression(body=node), filename='', mode='eval')
-        )

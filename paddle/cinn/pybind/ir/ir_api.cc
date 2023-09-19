@@ -101,19 +101,10 @@ void BindLoweredFunc(py::module *m) {
            [](const ir::LoweredFunc &self) -> std::string {
              return utils::GetStreamCnt(Expr(self));
            })
-      .def("__repr__",
-           [](const ir::LoweredFunc &self) -> std::string {
-             return llvm::formatv(
-                 "<LoweredFunc {0}>", self.get(), self->name.c_str());
-           })
-      .def("body", [](const ir::LoweredFunc &self) { return self->body; })
-      .def_static("make",
-                  py::overload_cast<const std::string &,
-                                    const std::vector<Argument> &,
-                                    const Expr &>(&ir::_LoweredFunc_::Make));
-
-  py::class_<ir::Buffer> buffer(*m, "Buffer");
-  buffer.def(py::init<>());
+      .def("__repr__", [](const ir::LoweredFunc &self) -> std::string {
+        return llvm::formatv(
+            "<LoweredFunc {0}>", self.get(), self->name.c_str());
+      });
 }
 
 void BindNode(py::module *m) {
@@ -271,12 +262,6 @@ void BindNode(py::module *m) {
       .def("__div__", [](const Expr &self, const Var &other) -> Expr {
         return self / other;
       });
-  // struct For : public ExprNode<For>
-  DefineExprNode<ir::For>(m, "For");
-  py::class_<ir::For, ExprNode<ir::For>> for_pybind(*m, "For");
-  for_pybind.def(py::init<>())
-      .def_static("make",
-                  py::overload_cast<Var, Expr, Expr, Expr>(&ir::For::Make));
 }
 
 // empty visitor
@@ -579,6 +564,8 @@ void BindIrIr(py::module *m) {
           "make",
           py::overload_cast<const std::string &, const std::vector<Expr> &>(
               &ir::_Buffer_::Make));
+  py::class_<ir::Buffer> buffer(*m, "Buffer");
+  buffer.def(py::init<>());
 
   py::class_<ir::ModuleExpr> module_expr(*m, "ModuleExpr");
   module_expr.def(py::init<const std::vector<Expr> &>());
@@ -829,12 +816,17 @@ void BindIrContext(py::module *m) {
 
   py::class_<IRContext> ir_ctx(*m, "IRContext");
   ir_ctx.def(py::init<>())
+      .def(py::init<IRContextNode *>())
       .def("EnterWithContext",
            [](IRContext &self) { self.data_->EnterWithContext(); })
       .def("ExitWithContext",
            [](IRContext &self) { self.data_->ExitWithContext(); })
-      .def("get_for_loop_var", [](IRContext &self) {
-        return self.data_->safe_as<ForContextNode>()->loop_var;
+      .def("get_for_loop_var",
+           [](IRContext &self) {
+             return self.data_->safe_as<ForContextNode>()->loop_var;
+           })
+      .def_static("MakeLowerFunctionContext", [](std::string &name) {
+        return IRContext(new LowerFuncContextNode(name));
       });
 
   py::class_<IRBuilder> ir_builder(*m, "IRBuilder");
@@ -847,23 +839,7 @@ void BindIrContext(py::module *m) {
 
   py::class_<ScheduleBlockContextNode> sch_block_ctx(*m,
                                                      "ScheduleBlockContext");
-  sch_block_ctx.def(py::init<>())
-      .def("EnterWithContext", &ScheduleBlockContextNode::EnterWithContext)
-      .def("ExitWithContext", &ScheduleBlockContextNode::ExitWithContext);
 
-  py::class_<LowerFuncContext> lower_func_ctx(*m, "LowerFuncContext");
-  lower_func_ctx.def(py::init<LowerFuncContextNode *>())
-      .def("EnterWithContext",
-           [](LowerFuncContext &self) {
-             return self.As<LowerFuncContextNode>()->EnterWithContext();
-           })
-      .def("ExitWithContext", [](LowerFuncContext &self) {
-        return self.As<LowerFuncContextNode>()->ExitWithContext();
-      });
-
-  py::class_<LowerFuncContextNode> lower_func_ctx_node(*m,
-                                                       "LowerFuncContextNode");
-  lower_func_ctx_node.def(py::init<>()).def(py::init<std::string>());
   m->def("AxisMap", &AxisMap);
   m->def("TensorStore", &TensorStore);
   m->def("Arg", py::overload_cast<std::string, Var>(&Arg));

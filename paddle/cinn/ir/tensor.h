@@ -162,6 +162,8 @@ class _Tensor_ : public ExprNode<_Tensor_> {
                      const std::vector<Expr>& domain,
                      FunctionRef fn,
                      const std::vector<Var>& reduce_axis = {});
+
+  // Manual tensor construction, no FunctionRef information
   static Tensor Make(const std::string& name,
                      Type dtype,
                      const std::vector<Expr>& shape,

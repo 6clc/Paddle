@@ -124,7 +124,6 @@ from ..core_api.ir import (  # noqa: F401
     _Var_,
     _Buffer_,
     Buffer,
-    For,
     ModuleExpr,
     IrCompare,
     IfThenElse,

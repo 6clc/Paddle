@@ -28,6 +28,9 @@
 #include "paddle/cinn/lang/placeholder.h"
 #include "paddle/cinn/pybind/bind.h"
 #include "paddle/cinn/pybind/bind_utils.h"
+#include "paddle/cinn/ir/schedule/ir_schedule.h"
+#include "paddle/cinn/optim/transform_gpu_forloop.h"
+#include "paddle/cinn/ir/schedule/ir_schedule_util.h"
 
 namespace py = pybind11;
 
@@ -148,7 +151,16 @@ void BindModule(py::module *m) {
 
   py::class_<ir::Module::Builder> builder(module, "Builder");
   builder.def(py::init<const std::string &, const common::Target &>())
-      .def("add_function", &ir::Module::Builder::AddFunction)
+      .def("add_function",
+           [](ir::Module::Builder &self, ir::LoweredFunc func) {
+             // TODO(6clc): optimize by register of backend passs
+             if (self.GetTarget() == Target::Arch::NVGPU ) {
+               auto func_expr = Expr(func);
+               ir::SetCudaAxisInfo(&func_expr);
+               optim::OptimizeExprGPU(&(func->body));
+             }
+             self.AddFunction(func);
+           })
       .def("add_buffer", &ir::Module::Builder::AddBuffer)
       .def("build", &ir::Module::Builder::Build);
 }

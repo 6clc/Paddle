@@ -37,7 +37,7 @@ void ScheduleBlockContextNode::ExitWithContext() {
 void ForContextNode::ExitWithContext() {
   IRContextNode::ExitWithContext();
   LinkToParentContext(
-      ir::For::Make(loop_var, min, extent, ir::Block::Make(exprs)));
+      ir::For::Make(loop_var, min, extent, ir::ForType::Serial, ir::DeviceAPI::UNK, ir::Block::Make(exprs)));
 }
 
 void LowerFuncContextNode::ExitWithContext() {

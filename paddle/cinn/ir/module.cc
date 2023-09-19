@@ -13,30 +13,9 @@
 // limitations under the License.
 
 #include "paddle/cinn/ir/module.h"
-#include "paddle/cinn/ir/schedule/ir_schedule.h"
-#include "paddle/cinn/optim/transform_gpu_forloop.h"
-
-#include <math.h>
-
-#include <algorithm>
-#include <iostream>
-#include <memory>
-#include <random>
-#include <set>
-#include <string>
-#include <unordered_map>
-#include <vector>
-
-#include "paddle/cinn/common/cas.h"
-#include "paddle/cinn/common/common.h"
-#include "paddle/cinn/common/ir_util.h"
-#include "paddle/cinn/ir/ir.h"
-#include "paddle/cinn/ir/op/ir_operators.h"
-#include "paddle/cinn/ir/schedule/ir_schedule_error.h"
 
 #include <memory>
 
-#include "paddle/cinn/ir/schedule/ir_schedule_util.h"
 #include "paddle/cinn/optim/ir_simplify.h"
 #include "paddle/cinn/optim/optimize.h"
 
@@ -44,9 +23,6 @@ namespace cinn {
 namespace ir {
 
 void Module::Builder::AddFunction(ir::LoweredFunc func) {
-  auto tmp = Expr(func);
-  ir::SetCudaAxisInfo(&tmp);
-  optim::OptimizeExprGPU(&(func->body));
   optim::Simplify(&(func->body));
   optim::SimplifyForLoops(&(func->body));
   optim::SimplifyBlocks(&(func->body));
@@ -76,6 +52,10 @@ void Module::Builder::Clear() {
   module_->buffers.clear();
   module_->functions.clear();
   module_->submodules.clear();
+}
+
+Target::Arch Module::Builder::GetTarget(){
+  return module_->target.arch;
 }
 
 Module Module::Builder::Build() {

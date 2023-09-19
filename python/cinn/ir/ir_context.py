@@ -46,40 +46,20 @@ class IRContext:
             self.ir_ctx.ExitWithContext()
 
 
-class ScheduleBlockContext(object):
+class ScheduleBlockContext(IRContext):
     def __init__(self, name):
         self.ir_ctx = core_api.ir.ScheduleBlockContext(name)
-        # super().__init__(sch_block_ctx)
-
-    def __enter__(self):
-        self.ir_ctx.EnterWithContext()
-
-    def __exit__(self, ptype, value, trace) -> None:
-        if ptype is None and value is None:
-            self.ir_ctx.ExitWithContext()
 
 
-class LowerFuncContext(object):
+class LowerFuncContext(IRContext):
     def __init__(self, name):
-        self.ir_ctx_node = core_api.ir.LowerFuncContextNode(name)
-        self.ir_ctx = core_api.ir.LowerFuncContext(self.ir_ctx_node)
-        # super().__init__(lower_func_ctx)
-
-    def __enter__(self):
-        self.ir_ctx.EnterWithContext()
-
-    def __exit__(self, ptype, value, trace) -> None:
-        if ptype is None and value is None:
-            self.ir_ctx.ExitWithContext()
+        self.ir_ctx = core_api.ir.IRContext.MakeLowerFunctionContext(name)
 
 
-class ForContext(object):
+class ForContext(IRContext):
     def __init__(self, min, extent):
         self.ir_ctx = ir.Sequential(min, extent)
-    def __enter__(self):
-        self.ir_ctx.EnterWithContext()
-        return self.ir_ctx.get_for_loop_var()
 
-    def __exit__(self, ptype, value, trace) -> None:
-        if ptype is None and value is None:
-            self.ir_ctx.ExitWithContext()
+    def __enter__(self):
+        super().__enter__()
+        return self.ir_ctx.get_for_loop_var()

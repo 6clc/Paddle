@@ -167,7 +167,7 @@ struct _LoweredFunc_ : ExprNode<_LoweredFunc_> {
                           const std::vector<ir::Buffer>& temp_bufs);
 
   // A simple version of the make function method,
-  // regardless of the argument buffer information,
+  // regardless of the argument buffer information and IO information of Argument,
   // after building the function to optimize the buffer through pass
   static LoweredFunc Make(const std::string& name,
                           const std::vector<Argument>& args,
