@@ -13,10 +13,11 @@
 # limitations under the License.
 
 
+import sys
 from test.cinn.utils.testing import assert_llir_equal
 
 import cinn.schedule as sch
-from cinn import to_cinn_llir
+from cinn import to_cinn_llir, ir
 from cinn.runtime.data_array import DataArray
 
 
@@ -28,21 +29,19 @@ def test_fuse():
         for i in range(128):
             for j in range(128):
                 for k in range(128):
-                    sch.fuse([i, j, k])
-                    i1 = i
-                    j1 = j
-                    k1 = k
-                    Y[i1, j1, k1] = X[i1, j1, k1] * 2.0
+                    with ir.ScheduleBlockContext("Y") as block_y:
+                        sch.fuse([i, j, k])
+                        i1, j1, k1 = ir.AxisMap("SSS", [i, j, k])
+                        Y[i1, j1, k1] = X[i1, j1, k1] * 2.0
 
     @to_cinn_llir
     def elementwise_fuse_assign_loop_gt(
         X: DataArray((128, 128, 128)), Y: DataArray((128, 128, 128))
     ):
         for i in range(2097152):
-            i1_1 = (i / 128) / 128
-            j1_1 = (i / 128) % 128
-            k1_1 = i % 128
-            Y[i1_1, j1_1, k1_1] = X[i1_1, j1_1, k1_1] * 2.0
+            with ir.ScheduleBlockContext("Y") as block_y:
+                i1_1, j1_1, k1_1 = ir.AxisMap("SSS", [(i/128)/128, (i/128)%128, i%128])
+                Y[i1_1, j1_1, k1_1] = X[i1_1, j1_1, k1_1] * 2.0
 
     assert_llir_equal(
         elementwise_fuse_assign_loop, elementwise_fuse_assign_loop_gt
@@ -57,13 +56,12 @@ def test_split():
         for i in range(128):
             for j in range(128):
                 for k in range(128):
-                    sch.split(i, factors=[2, 1, 64])
-                    sch.split(j, factors=[4, 32])
-                    sch.split(k, factors=[16, 8])
-                    i1 = i
-                    j1 = j
-                    k1 = k
-                    Y[i1, j1, k1] = X[i1, j1, k1] * 2.0
+                    with ir.ScheduleBlockContext("Y"):
+                        i1, j1, k1 = ir.AxisMap("SSS", [i, j, k])
+                        sch.split(i, factors=[2, 1, 64])
+                        sch.split(j, factors=[4, 32])
+                        sch.split(k, factors=[16, 8])
+                        Y[i1, j1, k1] = X[i1, j1, k1] * 2.0
 
     @to_cinn_llir
     def elementwise_split_inferred_factor(
@@ -72,13 +70,12 @@ def test_split():
         for i in range(128):
             for j in range(128):
                 for k in range(128):
-                    sch.split(i, factors=[-1, 1, 64])
-                    sch.split(j, factors=[4, -1])
-                    sch.split(k, factors=[-1, 8])
-                    i1 = i
-                    j1 = j
-                    k1 = k
-                    Y[i1, j1, k1] = X[i1, j1, k1] * 2.0
+                    with ir.ScheduleBlockContext("Y"):
+                        i1, j1, k1 = ir.AxisMap("SSS", [i, j, k])
+                        sch.split(i, factors=[-1, 1, 64])
+                        sch.split(j, factors=[4, -1])
+                        sch.split(k, factors=[-1, 8])
+                        Y[i1, j1, k1] = X[i1, j1, k1] * 2.0
 
     assert_llir_equal(elementwise_split, elementwise_split_inferred_factor)
 
@@ -91,13 +88,12 @@ def test_split_predicate():
         for i in range(128):
             for j in range(128):
                 for k in range(128):
-                    sch.split(i, factors=[1000, 1, 64])
-                    sch.split(j, factors=[4, 32])
-                    sch.split(k, factors=[16, 8])
-                    i1 = i
-                    j1 = j
-                    k1 = k
-                    Y[i1, j1, k1] = X[i1, j1, k1] * 2.0
+                    with ir.ScheduleBlockContext("Y"):
+                        i1, j1, k1 = ir.AxisMap("SSS", [i, j, k])
+                        sch.split(i, factors=[1000, 1, 64])
+                        sch.split(j, factors=[4, 32])
+                        sch.split(k, factors=[16, 8])
+                        Y[i1, j1, k1] = X[i1, j1, k1] * 2.0
 
     @to_cinn_llir
     def elementwise_split_predicate_gt(
@@ -111,10 +107,12 @@ def test_split_predicate():
                             for j_0 in range(32):
                                 for k in range(16):
                                     for k_0 in range(8):
-                                        i1 = (64 * i) + ((64 * i_0) + i_1)
-                                        j1 = (32 * j) + j_0
-                                        k1 = (8 * k) + k_0
-                                        Y[i1, j1, k1] = X[i1, j1, k1] * 2.0
+                                        with ir.ScheduleBlockContext("Y"):
+                                            i1, j1, k1 = ir.AxisMap("SSS",
+                                                       [(64 * i) + ((64 * i_0) + i_1),
+                                                        (32 * j) + j_0,
+                                                        (8 * k) + k_0])
+                                            Y[i1, j1, k1] = X[i1, j1, k1] * 2.0
 
     assert_llir_equal(
         elementwise_split_predicate, elementwise_split_predicate_gt

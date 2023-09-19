@@ -4,10 +4,18 @@ namespace cinn {
 namespace pybind {
 void TensorStore(Expr tensor, Expr value, const std::vector<Expr>& indices) {
   // TODO(6clc): Check the compatibility of data types for tensor and value
+  IRContext find_sch_block = IRBuilder::CurrentIRBuilder().data_->FindContext<ScheduleBlockContextNode>();
+  if( !find_sch_block.data_.defined()){
+    IRContext sch_block(new ScheduleBlockContextNode());
+    sch_block.data_->EnterWithContext();
+    LinkToParentContext(ir::Store::Make(tensor, value, indices));
+    sch_block.data_->ExitWithContext();
+    return;
+  }
   LinkToParentContext(ir::Store::Make(tensor, value, indices));
 }
-std::vector<Var> AxisMap(std::string kinds, std::vector<Expr> iter_expression) {
-  std::vector<Var> rets;
+std::vector<Expr> AxisMap(const std::string& kinds, const std::vector<Expr>& iter_expression) {
+  std::vector<Expr> rets;
   CHECK_EQ(kinds.size(), iter_expression.size());
   int n = iter_expression.size();
   rets.reserve(n);
@@ -16,7 +24,7 @@ std::vector<Var> AxisMap(std::string kinds, std::vector<Expr> iter_expression) {
 
     // TODO(6clc): set bound of IterVar
 
-    Var iter_var = ir::_Var_::Make("", common::Int(32));
+    Var iter_var = ir::_Var_::Make("iter_tmp", common::Int(32));
     if (c == 'S') {
       iter_var->is_reduce_axis = false;
     } else if (c == 'R') {
@@ -27,6 +35,7 @@ std::vector<Var> AxisMap(std::string kinds, std::vector<Expr> iter_expression) {
     }
     rets.push_back(SetScheduleBlockIterVar(iter_var, iter_expression[i]));
   }
+  return rets;
 }
 Var SetScheduleBlockIterVar(Var iter_var, Expr expr) {
   IRContext cur_context =
@@ -35,10 +44,10 @@ Var SetScheduleBlockIterVar(Var iter_var, Expr expr) {
       cur_context.As<ScheduleBlockContextNode>();
   cur_context_node->iter_vars.push_back(iter_var);
   cur_context_node->iter_values.push_back(expr);
-  return iter_var;
+  return iter_var.operator Expr();
 }
 
-Expr Arg(std::string name, Var var) {
+Expr Arg(const std::string &name, Var var) {
   IRContext ctx =
       IRBuilder::CurrentIRBuilder().data_->FindContext<LowerFuncContextNode>();
   var->name = name;
@@ -47,7 +56,7 @@ Expr Arg(std::string name, Var var) {
   return var.operator Expr();
 }
 
-Expr Arg(std::string name, ir::Buffer buffer) {
+Expr Arg(const std::string &name, ir::Buffer buffer) {
   IRContext ctx =
       IRBuilder::CurrentIRBuilder().data_->FindContext<LowerFuncContextNode>();
   buffer->name = "_" + name;

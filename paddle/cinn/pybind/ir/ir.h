@@ -24,10 +24,10 @@ namespace pybind {
 
 template IRContext IRBuilderNode::GetLastContext<ScheduleBlockContextNode>() const;
 Var SetScheduleBlockIterVar(Var iter_var, Expr expr);
-std::vector<Var> AxisMap(std::string kinds, std::vector<Expr> iter_expression);
+std::vector<Expr> AxisMap(const std::string& kinds, const std::vector<Expr>& iter_expression);
 void TensorStore(Expr tensor, Expr value, const std::vector<Expr> &indices);
-Expr Arg(std::string name, Var var);
-Expr Arg(std::string name, ir::Buffer buffer);
+Expr Arg(const std::string &name, Var var);
+Expr Arg(const std::string &name, ir::Buffer buffer);
 IRContext Sequential(Expr min, Expr extent);
 }  // namespace pybind
 }  // namespace cinn

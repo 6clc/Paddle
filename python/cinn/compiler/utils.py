@@ -33,7 +33,10 @@ def node_is_schedule(node: ast.Call):
 
 class VariableTable:
     def __init__(self):
+        # var name added by current context
         self.var_name_list = []
+        # var name to var. Dtype is {string:list}
+        # list records the value assigned to each layer of context
         self.name2value = defaultdict(list)
 
     def __enter__(self):
@@ -41,6 +44,7 @@ class VariableTable:
         return self
 
     def __exit__(self, ptype, value, trace) -> None:
+        # clear var assign in current context
         if ptype is None and value is None:
             var_names = self.var_name_list.pop()
             for var_name in var_names:

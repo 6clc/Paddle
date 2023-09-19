@@ -44,7 +44,8 @@ def compile(fn, just_convert=False, jit_inputs_signature=[], **kwargs):
     if isinstance(fn, CinnLowerLevelIrJit):
         llir_func = ast_to_llir(fn, jit_inputs_signature)
     else:
-        raise Exception("Current Only support compile from CinnLowerLevelIrJit")
+        raise Exception(
+            "Current Only support compile from CinnLowerLevelIrJit")
 
     if just_convert:
         return llir_func

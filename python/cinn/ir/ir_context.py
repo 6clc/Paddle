@@ -48,7 +48,7 @@ class IRContext:
 
 class ScheduleBlockContext(IRContext):
     def __init__(self, name):
-        self.ir_ctx = core_api.ir.ScheduleBlockContext(name)
+        self.ir_ctx = core_api.ir.IRContext.MakeScheduleBlockContext(name)
 
 
 class LowerFuncContext(IRContext):
@@ -63,3 +63,18 @@ class ForContext(IRContext):
     def __enter__(self):
         super().__enter__()
         return self.ir_ctx.get_for_loop_var()
+
+
+class IfContext(IRContext):
+    def __init__(self, expr):
+        self.ir_ctx = core_api.ir.IRContext.MakeIfContext(expr)
+
+
+class ThenContext(IRContext):
+    def __init__(self):
+        self.ir_ctx = core_api.ir.IRContext.MakeThenContext()
+
+
+class ElseContext(IRContext):
+    def __init__(self):
+        self.ir_ctx = core_api.ir.IRContext.MakeElseContext()

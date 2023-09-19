@@ -15,7 +15,7 @@
 from test.cinn.utils.testing import assert_llir_equal
 
 import cinn.schedule as sch
-from cinn import to_cinn_llir
+from cinn import to_cinn_llir, ir
 from cinn.runtime.data_array import DataArray
 
 
@@ -28,12 +28,10 @@ def test_reorder_elementwise():
             for j in range(64):
                 for k in range(64):
                     for l in range(8):
-                        sch.reorder([k, l, i])
-                        vi = i
-                        vj = j
-                        vk = k
-                        vl = 8 * l
-                        Y[vi, vj, vk, vl] = X[vi, vj, vk, vl] * 2.0
+                        with ir.ScheduleBlockContext("Y"):
+                            vi, vj, vk, vl = ir.AxisMap("SSSS", [i, j, k, 8*l])
+                            sch.reorder([k, l, i])
+                            Y[vi, vj, vk, vl] = X[vi, vj, vk, vl] * 2.0
 
     @to_cinn_llir
     def reorder_elementwise_gt(
@@ -43,11 +41,9 @@ def test_reorder_elementwise():
             for j in range(64):
                 for l in range(8):
                     for i in range(64):
-                        vi = i
-                        vj = j
-                        vk = k
-                        vl = 8 * l
-                        Y[vi, vj, vk, vl] = X[vi, vj, vk, vl] * 2.0
+                        with ir.ScheduleBlockContext("Y"):
+                            vi, vj, vk, vl = ir.AxisMap("SSSS", [i, j, k, 8*l])
+                            Y[vi, vj, vk, vl] = X[vi, vj, vk, vl] * 2.0
 
     assert_llir_equal(reorder_elementwise, reorder_elementwise_gt)
 
@@ -58,19 +54,19 @@ def test_reorder_overlapped():
         for i in range(12):
             for j in range(4):
                 for k in range(4):
-                    sch.reorder([i, k, j])
-                    vi = i * 2 + j
-                    vj = k
-                    Y[vi, vj] = X[vi, vj] + 1.0
+                    with ir.ScheduleBlockContext("Y"):
+                        vi, vj = ir.AxisMap("SS", [i, j])
+                        sch.reorder([i, k, j])
+                        Y[vi, vj] = X[vi, vj] + 1.0
 
     @to_cinn_llir
     def reorder_overlapped_gt(X: DataArray((28, 8)), Y: DataArray((28, 8))):
         for i in range(12):
             for k in range(4):
                 for j in range(4):
-                    vi = i * 2 + j
-                    vj = k
-                    Y[vi, vj] = X[vi, vj] + 1.0
+                    with ir.ScheduleBlockContext("Y"):
+                        vi, vj = ir.AxisMap("SS", [i*2+j, k])
+                        Y[vi, vj] = X[vi, vj] + 1.0
 
     assert_llir_equal(reorder_overlapped, reorder_overlapped_gt)
 

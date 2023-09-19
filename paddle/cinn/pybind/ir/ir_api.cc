@@ -101,10 +101,12 @@ void BindLoweredFunc(py::module *m) {
            [](const ir::LoweredFunc &self) -> std::string {
              return utils::GetStreamCnt(Expr(self));
            })
-      .def("__repr__", [](const ir::LoweredFunc &self) -> std::string {
-        return llvm::formatv(
-            "<LoweredFunc {0}>", self.get(), self->name.c_str());
-      });
+      .def("__repr__",
+           [](const ir::LoweredFunc &self) -> std::string {
+             return llvm::formatv(
+                 "<LoweredFunc {0}>", self.get(), self->name.c_str());
+           })
+      .def("body", [](const ir::LoweredFunc &self) { return self->body; });
 }
 
 void BindNode(py::module *m) {
@@ -642,6 +644,8 @@ void BindIrTensor(py::module *m) {
            [](ir::Tensor &self, Expr a, Expr b, Expr c, Expr d) {
              return self(a, b, c, d);
            })
+      .def("__getitem__",
+           [](ir::Tensor &self, std::vector<Expr> idx) { return self(idx); })
       .def("Expr", [](ir::Tensor &self) { return self.operator Expr(); });
 
   DefineExprNode<ir::_Tensor_>(m, "_Tensor_");
@@ -825,9 +829,20 @@ void BindIrContext(py::module *m) {
            [](IRContext &self) {
              return self.data_->safe_as<ForContextNode>()->loop_var;
            })
-      .def_static("MakeLowerFunctionContext", [](std::string &name) {
-        return IRContext(new LowerFuncContextNode(name));
-      });
+      .def_static("MakeLowerFunctionContext",
+                  [](std::string &name) {
+                    return IRContext(new LowerFuncContextNode(name));
+                  })
+      .def_static("MakeScheduleBlockContext",
+                  [](std::string &name) {
+                    return IRContext(new ScheduleBlockContextNode(name));
+                  })
+      .def_static("MakeIfContext",
+                  [](Expr expr) { return IRContext(new IfContextNode(expr)); })
+      .def_static("MakeElseContext",
+                  []() { return IRContext(new ElseContextNode()); })
+      .def_static("MakeThenContext",
+                  []() { return IRContext(new ThenContextNode()); });
 
   py::class_<IRBuilder> ir_builder(*m, "IRBuilder");
   ir_builder.def(py::init<>())
@@ -837,13 +852,10 @@ void BindIrContext(py::module *m) {
         return self.data_->GetResult().as_lowered_func_ref();
       });
 
-  py::class_<ScheduleBlockContextNode> sch_block_ctx(*m,
-                                                     "ScheduleBlockContext");
-
   m->def("AxisMap", &AxisMap);
   m->def("TensorStore", &TensorStore);
-  m->def("Arg", py::overload_cast<std::string, Var>(&Arg));
-  m->def("Arg", py::overload_cast<std::string, ir::Buffer>(&Arg));
+  m->def("Arg", py::overload_cast<const std::string &, Var>(&Arg));
+  m->def("Arg", py::overload_cast<const std::string &, ir::Buffer>(&Arg));
   m->def("Sequential", py::overload_cast<Expr, Expr>(&Sequential));
 }
 }  // namespace

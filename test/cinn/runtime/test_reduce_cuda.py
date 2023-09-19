@@ -13,11 +13,10 @@
 # limitations under the License.
 
 
-
 import cinn
 import cinn.schedule as sch
 import numpy as np
-from cinn import to_cinn_llir
+from cinn import to_cinn_llir, ir
 from cinn.runtime.data_array import DataArray
 
 
@@ -26,16 +25,18 @@ def reduce_sum(A, B):
     for i1 in range(1):
         for j1 in range(2):
             for k1 in range(4):
-                with ir.block("init") as init:
-                    vi, vj, vk = i1, j1, k1
+                with ir.ScheduleBlockContext("init") as init:
+                    vi, vj, vk = ir.AxisMap("SSS", [i1, j1, k1])
                     B[vi, vj, vk] = 0.0
                 for l1 in range(8):
                     sch.bind(i1, "blockIdx.x")
                     sch.bind(j1, "threadIdx.z")
                     sch.bind(k1, "threadIdx.x")
-                    vi1, vj1, vk1, vl1 = i1, j1, k1, l1
-                    vl1.is_reduce_axis = True
-                    B[vi1, vj1, vk1] = B[vi1, vj1, vk1] + A[vi1, vj1, vk1, vl1]
+                    with ir.ScheduleBlockContext("B"):
+                        vi1, vj1, vk1, vl1 = ir.AxisMap(
+                            "SSSR", [i1, j1, k1, l1])
+                        B[vi1, vj1, vk1] = B[vi1, vj1, vk1] + \
+                            A[vi1, vj1, vk1, vl1]
 
 
 def test_reduce_cuda():

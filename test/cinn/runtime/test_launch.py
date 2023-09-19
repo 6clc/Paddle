@@ -17,12 +17,15 @@ import cinn
 import numpy as np
 from cinn import to_cinn_llir
 from cinn.runtime.data_array import DataArray
+from cinn import ir
 
 
 @to_cinn_llir
 def bin_op_kernel(X, Y, Z):
     for idx in range(10):
-        Z[idx] = X[idx] + Y[idx]
+        with ir.ScheduleBlockContext("Z"):
+            idx1 = ir.AxisMap("S", [idx])
+            Z[idx1] = X[idx1] + Y[idx1]
 
 
 def test_launch():

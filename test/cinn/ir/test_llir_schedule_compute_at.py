@@ -15,7 +15,7 @@
 from test.cinn.utils.testing import assert_llir_equal
 
 import cinn.schedule as sch
-from cinn import to_cinn_llir
+from cinn import to_cinn_llir, ir
 from cinn.runtime.data_array import DataArray
 
 
@@ -28,15 +28,15 @@ def test_compute_at_elementwise():
     ):
         for i in range(128):
             for j in range(128):
-                i1 = i
-                j1 = j
-                A[i1, j1] = X[i1, j1] * 2.0
+                with ir.ScheduleBlockContext("A"):
+                    i1, j1 = ir.AxisMap("SS", [i, j])
+                    A[i1, j1] = X[i1, j1] * 2.0
         for i3 in range(128):
             for j3 in range(128):
-                sch.compute_at(A, i3, False)
-                i1 = i3
-                j1 = j3
-                Y[i1, j1] = A[i1, j1] + 2.0
+                with ir.ScheduleBlockContext("Y"):
+                    i1, j1 = ir.AxisMap("SS", [i3, j3])
+                    sch.compute_at(A, i3, False)
+                    Y[i1, j1] = A[i1, j1] + 2.0
 
     @to_cinn_llir
     def elementwise_add_gt(
@@ -46,13 +46,13 @@ def test_compute_at_elementwise():
     ):
         for i in range(128):
             for j in range(128):
-                i1 = i
-                j1 = 0 + j
-                A[i1, j1] = X[i1, j1] * 2.0
+                with ir.ScheduleBlockContext("A"):
+                    i1, j1 = ir.AxisMap("SS", [i, 0+j])
+                    A[i1, j1] = X[i1, j1] * 2.0
             for k in range(128):
-                i2 = i
-                k1 = k
-                Y[i2, k1] = A[i2, k1] + 2.0
+                with ir.ScheduleBlockContext("Y"):
+                    i2, k1 = ir.AxisMap("SS", [i, k])
+                    Y[i2, k1] = A[i2, k1] + 2.0
 
     assert_llir_equal(elementwise_add, elementwise_add_gt)
 

@@ -30,7 +30,7 @@ class ExprExecutor(object):
         ret = self.visit(node)
         if isinstance(ret, ast.Name):
             return  self.var_table[ret.id]
-        if isinstance(ret, ret.Constant):
+        if isinstance(ret, ast.Constant):
             return ret.value
         raise Exception(f"Error result type: {type(ret)}")
 
@@ -81,8 +81,22 @@ class ExprExecutor(object):
     def eval_BinOp(self, fields):
         args = [self.exec_expr(fields["left"]),
                 self.exec_expr(fields["right"])]
+        args = [ ir.Expr(item) if not isinstance(item, ir.Expr) else item for item in args]
         return AST2CINN[type(fields["op"])].make(*args)
 
+    def eval_UnaryOp(self, fields):
+        args = [self.exec_expr(fields["operand"])]
+        args = [ ir.Expr(item) if not isinstance(item, ir.Expr) else item for item in args]
+        return AST2CINN[type(fields["op"])].make(*args)
+
+    def eval_Compare(self, fields):
+        assert (
+            len(fields["ops"]) == 1
+        ), "Only binary comparison symbols are supported. Expressions such as '1 <= a < 10' are not supported."
+        args = [self.exec_expr(fields["left"]),
+                self.exec_expr(fields["comparators"][0])]
+        args = [ ir.Expr(item) if not isinstance(item, ir.Expr) else item for item in args]
+        return AST2CINN[type(fields["ops"][0])].make(*args)
 
     def save_temp_value(self, value):
         name = f"__cinn_python_script_tmp_value_{self.tmp_value_count}"

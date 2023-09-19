@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from .ir import sequential
-from .ir_context import IRBuilder, ScheduleBlockContext, LowerFuncContext
+from .ir_context import *
 from ..core_api.ir import (  # noqa: F401
     Add,
     And,
@@ -129,7 +129,8 @@ from ..core_api.ir import (  # noqa: F401
     IfThenElse,
     Arg,
     Sequential,
-    TensorStore
+    TensorStore,
+    AxisMap
 )
 
 

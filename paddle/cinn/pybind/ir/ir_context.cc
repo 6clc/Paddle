@@ -36,18 +36,50 @@ void ScheduleBlockContextNode::ExitWithContext() {
 
 void ForContextNode::ExitWithContext() {
   IRContextNode::ExitWithContext();
-  LinkToParentContext(
-      ir::For::Make(loop_var, min, extent, ir::ForType::Serial, ir::DeviceAPI::UNK, ir::Block::Make(exprs)));
+  LinkToParentContext(ir::For::Make(loop_var,
+                                    min,
+                                    extent,
+                                    ir::ForType::Serial,
+                                    ir::DeviceAPI::UNK,
+                                    ir::Block::Make(exprs)));
 }
 
 void LowerFuncContextNode::ExitWithContext() {
   IRContextNode::ExitWithContext();
   // TODO(6clc): implement Private Fields for intrinstic function, like
   // allreduce
+  Expr body = ir::ScheduleBlockRealize::Make(
+      {}, ir::ScheduleBlock::Make({},{}, {}, "root", ir::Block::Make(exprs))
+      );
   ir::LoweredFunc lower_func =
-      ir::_LoweredFunc_::Make(name, args, ir::Block::Make(exprs));
+      ir::_LoweredFunc_::Make(name, args, ir::Block::Make({body}));
   IRBuilder ir_builder = IRBuilder::CurrentIRBuilder();
   ir_builder.data_->result = lower_func.operator Expr();
+}
+
+void IfContextNode::ExitWithContext() {
+  IRContextNode::ExitWithContext();
+  if (!exprs.empty()) {
+    LOG(FATAL) << "Expr not be either in ThenBlock or ElseBlock in if";
+  }
+  if (!true_case.defined()){
+    LOG(FATAL) << "Expr not be defined in ThenBlock";
+  }
+  LinkToParentContext(ir::IfThenElse::Make(condition, true_case, false_case));
+}
+
+
+void ThenContextNode::ExitWithContext(){
+  IRContextNode::ExitWithContext();
+  IRContext for_ctx = IRBuilder::CurrentIRBuilder().data_->GetLastContext<IfContextNode>();
+  for_ctx.data_->safe_as<IfContextNode>()->true_case = ir::Block::Make(exprs);
+}
+
+void ElseContextNode::ExitWithContext(){
+  IRContextNode::ExitWithContext();
+  IRContext for_ctx = IRBuilder::CurrentIRBuilder().data_->GetLastContext<IfContextNode>();
+  for_ctx.data_->safe_as<IfContextNode>()->false_case = ir::Block::Make(exprs);
+
 }
 
 Expr IRBuilderNode::GetResult() const {
@@ -55,10 +87,10 @@ Expr IRBuilderNode::GetResult() const {
   return result;
 }
 
- void IRBuilderNode::Reset(){
-   contexts.clear();
-   result.Reset();
- }
+void IRBuilderNode::Reset() {
+  contexts.clear();
+  result.Reset();
+}
 
 IRBuilder::IRBuilder() {
   common::Shared<IRBuilderNode> n(new IRBuilderNode());

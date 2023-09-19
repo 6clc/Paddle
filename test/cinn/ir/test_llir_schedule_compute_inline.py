@@ -15,7 +15,7 @@
 from test.cinn.utils.testing import assert_llir_equal
 
 import cinn.schedule as sch
-from cinn import to_cinn_llir
+from cinn import to_cinn_llir, ir
 from cinn.runtime.data_array import DataArray
 
 
@@ -28,15 +28,15 @@ def test_compute_inline_elementwise():
     ):
         for i in range(128):
             for j in range(128):
-                i1 = i
-                j1 = j
-                A[i1, j1] = X[i1, j1] * 2.0
-                sch.compute_inline(A)
+                with ir.ScheduleBlockContext("A"):
+                    i1, j1 = ir.AxisMap("SS", [i, j])
+                    A[i1, j1] = X[i1, j1] * 2.0
+                    sch.compute_inline(A)
         for i3 in range(128):
             for j3 in range(128):
-                i1 = i3
-                j1 = j3
-                Y[i1, j1] = -A[i1, j1] + 3.0
+                with ir.ScheduleBlockContext("Y"):
+                    i1, j1 = ir.AxisMap("SS", [i3, j3])
+                    Y[i1, j1] = -A[i1, j1] + 3.0
 
     @to_cinn_llir
     def elementwise_add_inline_gt(
@@ -46,9 +46,9 @@ def test_compute_inline_elementwise():
     ):
         for i in range(128):
             for j in range(128):
-                i1 = i
-                j1 = j
-                Y[i1, j1] = -(X[i1, j1] * 2.0) + 3.0
+                with ir.ScheduleBlockContext("Y"):
+                    i1, j1 = ir.AxisMap("SS", [i, j])
+                    Y[i1, j1] = -(X[i1, j1] * 2.0) + 3.0
 
     assert_llir_equal(elementwise_add_inline, elementwise_add_inline_gt)
 

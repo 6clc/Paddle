@@ -14,6 +14,8 @@
 
 import ast
 from typing import List, Union
+import contextlib
+
 
 from cinn import ir
 from cinn.runtime.data_array import DataArray
@@ -109,10 +111,8 @@ class ComputeCodeGenerator(ast.NodeVisitor):
             for arg in node.args:
                 arg_annotation = arg.annotation
                 if isinstance(arg_annotation, ast.Call):
-                    data_array_args = [
-                        self.visit(item) for item in arg_annotation.args
-                    ]
-                    self.inputs_signature.append(DataArray(*data_array_args))
+                    self.inputs_signature.append(ExprExecutor(
+                        self.variables_table.get()).exec(arg_annotation))
                 elif isinstance(arg_annotation, int):
                     if (
                         -(2**21) <= arg_annotation
@@ -188,6 +188,9 @@ class ComputeCodeGenerator(ast.NodeVisitor):
             else:
                 expr_indices = [ExprExecutor(
                     self.variables_table.get()).exec(lhs.slice)]
+            # TODO(6clc): Implement implicit type conversion (constant ->Expr)
+            if not isinstance(rhs_expr, ir.Expr):
+                rhs_expr = ir.Expr(rhs_expr)
             ir.TensorStore(expr_tensor.Expr(), rhs_expr, expr_indices)
         # 2.2 Attribute of Var
         elif isinstance(lhs, ast.Attribute):
@@ -196,18 +199,18 @@ class ComputeCodeGenerator(ast.NodeVisitor):
             return "no compute"
         # 2.3 Var
         else:
-            iter_var_ids = self.visit(lhs)
-            rhs_exprs = rhs_expr
-            if not isinstance(iter_var_ids, List):
-                iter_var_ids = [iter_var_ids]
-                rhs_exprs = [rhs_expr]
-            for i in range(len(iter_var_ids)):
-                iter_var = ir.Var(iter_var_ids[i])
-                iter_var_expr = ir.Expr(iter_var)
-                self.set_value(iter_var_ids[i], iter_var_expr)
-                self.schedule_block_iter_var2expr[iter_var] = rhs_exprs[i]
-
-            return "no compute"
+            # TODO(6clc): We need to figure out a better way to
+            # handle the IterVar names and python variable names same
+            # Current only suport AxisMap function
+            local_var_table = exec_assign(target=lhs, source=rhs_expr)
+            if isinstance(lhs, ast.Tuple):
+                for k, v in local_var_table.items():
+                    v.as_var_ref().rename(k)
+                    self.variables_table.add(k, v)
+            else:
+                for k, v in local_var_table.items():
+                    v[0].as_var_ref().rename(k)
+                    self.variables_table.add(k, v[0])
 
     def visit_Call(self, node):
         func_name = node.func.attr
@@ -215,18 +218,26 @@ class ComputeCodeGenerator(ast.NodeVisitor):
             return "no compute"
 
     def visit_If(self, node):
-        condition_expr = self.visit(node.test)
-        true_expr = self.visit_compound_statement(node.body)
-        if len(node.orelse) == 0:
-            return ir.IfThenElse.make(condition_expr, true_expr)
-        false_expr = self.visit_compound_statement(node.orelse)
-        return ir.IfThenElse.make(condition_expr, true_expr, false_expr)
+        with self.variables_table:
+            with ir.IfContext(ExprExecutor(self.variables_table.get()).exec(node.test)):
+                with ir.ThenContext():
+                    with self.variables_table:
+                        self.visit_compound_statement(node.body)
+                if node.orelse:
+                    with ir.ElseContext():
+                        with self.variables_table:
+                            self.visit_compound_statement(node.body)
 
     def visit_With(self, node):
-        for item in node.items:
-            frame = sel.eval_expr(item.context_expr)
-            rhs = frame
-            if item.optional_vars is not None:
-                self.eval_assign(target=item.optional_vars, source=rhs)
-        body = self.visit_compound_statement(node.body)
-        return body
+        with self.variables_table:
+            with contextlib.ExitStack() as context_stack:
+                for item in node.items:
+                    cur_ctx = ExprExecutor(
+                        self.variables_table.get()).exec(item.context_expr)
+                    cur_ctx = context_stack.enter_context(cur_ctx)
+                    if item.optional_vars is not None:
+                        local_var_table = exec_assign(
+                            target=item.optional_vars, source=cur_ctx)
+                        for k, v in local_var_table.items():
+                            self.variables_table.add(k, v)
+                body = self.visit_compound_statement(node.body)

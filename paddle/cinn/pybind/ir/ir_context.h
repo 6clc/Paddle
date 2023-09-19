@@ -21,6 +21,7 @@
 #include "paddle/cinn/ir/ir.h"
 #include "paddle/cinn/ir/ir_base.h"
 #include "paddle/cinn/ir/lowered_func.h"
+#include "paddle/cinn/utils/error.h"
 
 namespace cinn {
 namespace pybind {
@@ -59,8 +60,15 @@ class IRContext {
     CHECK(data_.get()) << "IrContext holds null";
     auto* ctx_node = data_.get()->safe_as<TIRContextNode>();
     if (!ctx_node) {
-      LOG(FATAL) << "TypeConvertError: convert " << data_.get()->type_info()
-                 << " to " << TIRContextNode::__type_info__;
+      // TODO(6clc):
+      std::stringstream err_msg;
+      err_msg << "TypeConvertError: convert " << data_.get()->type_info()
+              << " to " << TIRContextNode::__type_info__;
+
+      CINN_THROW(err_msg.str());
+      // CINN_THROW(...) << "TypeConvertError: convert " <<
+      // data_.get()->type_info()
+      //            << " to " << TIRContextNode::__type_info__;
     }
     return ctx_node;
   }
@@ -124,7 +132,6 @@ class ForContextNode : public IRContextNode {
   static constexpr const char* __type_info__ = "ForContextNode";
 };
 
-
 class LowerFuncContextNode : public IRContextNode {
  public:
   //! The name of this function.
@@ -142,6 +149,44 @@ class LowerFuncContextNode : public IRContextNode {
   static constexpr const char* __type_info__ = "LowerFuncContextNode";
 };
 
+class IfContextNode : public IRContextNode {
+ public:
+  Expr condition;
+  Expr true_case;
+  Expr false_case;
+
+ public:
+  IfContextNode() = default;
+  IfContextNode(Expr condition)
+      : condition(condition), true_case(Expr()), false_case(Expr()) {}
+  const char* type_info() const override { return __type_info__; }
+
+  void ExitWithContext() final;
+
+ public:
+  static constexpr const char* __type_info__ = "IfContextNode";
+};
+
+class ThenContextNode : public IRContextNode {
+ public:
+  ThenContextNode() = default;
+  const char* type_info() const override { return __type_info__; }
+
+  void ExitWithContext() final;
+
+ public:
+  static constexpr const char* __type_info__ = "ThenContextNode";
+};
+
+class ElseContextNode : public IRContextNode {
+ public:
+  ElseContextNode() = default;
+  const char* type_info() const override { return __type_info__; }
+  void ExitWithContext() final;
+
+ public:
+  static constexpr const char* __type_info__ = "ElseContextNode";
+};
 
 class IRBuilderNode : public common::Object {
  public:
@@ -190,6 +235,7 @@ IRContext IRBuilderNode::FindContext() const {
       return *it;
     }
   }
+  return IRContext();
 }
 
 }  // namespace pybind

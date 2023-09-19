@@ -15,7 +15,7 @@
 from test.cinn.utils.testing import assert_llir_equal
 
 import cinn.schedule as sch
-from cinn import to_cinn_llir
+from cinn import to_cinn_llir, ir
 from cinn.runtime.data_array import DataArray
 
 
@@ -33,10 +33,9 @@ def test_split_reorder_elementwise():
                         i, factors=[2, 4, 64, 2]
                     )
                     sch.reorder([i_split_2, i_split_0])
-                    i1 = i
-                    j1 = j
-                    k1 = k
-                    Z[i1, j1] = Z[i1, j1] + X[i1, k] * Y[k, j1]
+                    with ir.ScheduleBlockContext("Z"):
+                        i1, j1, k1 = ir.AxisMap("SSS", [i, j, k])
+                        Z[i1, j1] = Z[i1, j1] + X[i1, k] * Y[k, j1]
 
     @to_cinn_llir
     def split_reorder_elementwise_gt(
@@ -50,12 +49,16 @@ def test_split_reorder_elementwise():
                     for i_2 in range(2):
                         for j in range(1024):
                             for k in range(1024):
-                                i1 = (512 * i) + (
-                                    (128 * i_0) + ((2 * i_1) + i_2)
-                                )
-                                j1 = j
-                                k1 = k
-                                Z[i1, j1] = Z[i1, j1] + (X[i1, k] * Y[k, j1])
+                                with ir.ScheduleBlockContext("Z"):
+                                    i1, j1, k1 = ir.AxisMap("SSS", [
+                                        (512 * i) + (
+                                            (128 * i_0) + ((2 * i_1) + i_2)
+                                        ),
+                                        j,
+                                        k
+                                    ])
+                                    Z[i1, j1] = Z[i1, j1] + \
+                                        (X[i1, k] * Y[k, j1])
 
     assert_llir_equal(split_reorder_elementwise, split_reorder_elementwise_gt)
 
