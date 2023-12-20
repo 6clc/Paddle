@@ -49,6 +49,7 @@ struct CINNKernelInfo {
   //     3: {1, 2}
   //   }
   std::map<int, ArgDimIdx> int_args_map;
+  std::map<std::string, void*> tensor_infer_shape;
 };
 
 struct CompatibleInfo {

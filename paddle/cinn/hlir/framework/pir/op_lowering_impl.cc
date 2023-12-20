@@ -467,12 +467,19 @@ std::vector<ir::LoweredFunc> OpLowererImpl::PostProcess(
   int num_tensor_args = static_cast<int>(group_func_args.size());
   int non_tensor_arg_idx = group_func_args.size();
   std::unordered_set<std::string> int_args_set;
+  std::vector<ir::Expr> ir_bodys;
   for (int tensor_arg_idx = 0; tensor_arg_idx < num_tensor_args;
        tensor_arg_idx++) {
+    VLOG(-1) << (*group_func_arg_tensors)[tensor_arg_idx]->name;
     auto tensor_dim = (*group_func_arg_tensors)[tensor_arg_idx]->sym_shape;
     int tensor_dim_size = tensor_dim.size();
     for (int tensor_arg_dim_idx = 0; tensor_arg_dim_idx < tensor_dim_size;
          tensor_arg_dim_idx++) {
+      ir_bodys.push_back(ir::Let::Make(
+          ir::Var("tensor_shape[" + std::to_string(tensor_arg_idx) + "][" +
+                  std::to_string(tensor_arg_dim_idx) + "]"),
+          tensor_dim[tensor_arg_dim_idx]->GetDimExpr()));
+
       if (tensor_dim[tensor_arg_dim_idx]->IsDynamic()) {
         const std::string symbol_name =
             tensor_dim[tensor_arg_dim_idx]->GetSymbolName();
@@ -489,6 +496,8 @@ std::vector<ir::LoweredFunc> OpLowererImpl::PostProcess(
       }
     }
   }
+  ir::LoweredFunc func = ir::_LoweredFunc_::Make(
+      "infer_shape", group_func_args, ir::Block(ir_bodys), {});
 
 #ifdef CINN_WITH_CUDA
   optim::OptimizeExprGPU(&(func_body));
@@ -499,6 +508,10 @@ std::vector<ir::LoweredFunc> OpLowererImpl::PostProcess(
   auto temp_buffers =
       lang::GetTempBuffers(*group_func_arg_tensors, stages, func_body);
   // 3.Building LoweredFunc
+  std::vector<ir::Argument> func_args;
+  for (auto& func_arg : group_func_args) {
+    func_args.push_back(func_arg);
+  }
   auto func = ir::_LoweredFunc_::Make(
       group->FuncName(), group_func_args, func_body, temp_buffers);
   if (!done_op_schedule) {
@@ -506,6 +519,12 @@ std::vector<ir::LoweredFunc> OpLowererImpl::PostProcess(
   }
   // 4.Apply low level pass
   func = optim::Optimize(Expr(func), target_, false).as_lowered_func_ref();
+
+  ir::Expr ir_body =
+      ir::Let::Make(ir::Var("tensor_a_shape0_dim0"), ir::Var("S1"));
+  auto infer_shape_func =
+      ir::_LoweredFunc_::Make("infer_hape", group_func_args, ir_body, {});
+  VLOG(-1) << infer_shape_func->body;
   return {func};
 }
 

@@ -124,6 +124,7 @@ void CinnJitInstruction::Run() {
     // TODO(6clc): template infer shape from tensor_args_[0].
     // After supporting symbolic calculation, perfect the code to query shape
     // of output tensor
+    VLOG(-1) << tensor_args_[i]->name();
     if (FLAGS_cinn_bucket_compile) {
       tensor_args_[i]->Resize(tensor_args_[0]->dims());
     }
