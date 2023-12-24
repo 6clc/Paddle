@@ -86,6 +86,7 @@ Expr Optimize(Expr e,
 }
 
 ir::Module Optimize(const ir::Module& module, const Target& target) {
+  // VLOG(-1) << module->infer_shape_func;
   auto copied = ir::ir_utils::IRCopy(Expr(module));
   ReplaceCrossThreadReduction(&copied);
   UnrollLoop(&copied);

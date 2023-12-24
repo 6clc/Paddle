@@ -19,6 +19,7 @@
 #include "paddle/cinn/ir/ir_printer.h"
 #include "paddle/cinn/optim/ir_simplify.h"
 #include "paddle/cinn/optim/optimize.h"
+#include "paddle/cinn/utils/error.h"
 
 namespace cinn {
 namespace ir {
@@ -53,6 +54,11 @@ void Module::Builder::AddPredicate(ir::Expr predicate) {
   module_->predicates.push_back(predicate);
 }
 
+void Module::Builder::AddInferShapeFunc(ir::Expr infer_shape_func) {
+  module_->infer_shape_func = infer_shape_func;
+  VLOG(-1) << module_ -> infer_shape_func;
+}
+
 void Module::Builder::Clear() {
   module_->buffers.clear();
   module_->functions.clear();
@@ -67,9 +73,17 @@ Module Module::Builder::Build() {
     VLOG(1) << "Module has no functions";
   }
 
+  VLOG(-1) << "ddddd ";
+  // VLOG(-1) << utils::enforce::GetCurrentTraceBackString();
+  // VLOG(-1) << module_->infer_shape_func;
+  VLOG(-1) << "ddddd ";
   auto res = ir::Module(module_.get());
+  VLOG(-1) << "ddddd ";
+  // VLOG(-1) << res->infer_shape_func;
+  VLOG(-1) << "ddddd ";
 
-  res = optim::Optimize(res, module_->target);
+  // VLOG(-1) << res->infer_shape_func;
+  res = optim::Optimize(res, module_->target); VLOG(-1) << "ddddd ";
   return res;
 }
 

@@ -47,7 +47,7 @@ class OpLowerer {
         group, apply_op_schedule, apply_group_schedule, apply_pass);
   }
 
-  std::vector<std::pair<ir::SymbolicPredicate, ir::LoweredFunc>> BucketLower(
+  std::vector<std::pair<ir::SymbolicPredicate, std::pair<ir::LoweredFunc, ir::LoweredFunc>>> BucketLower(
       const T& group,
       bool apply_op_schedule = false,
       bool apply_group_schedule = true,

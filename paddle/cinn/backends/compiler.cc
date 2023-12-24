@@ -229,6 +229,7 @@ void SourceCodePrint::write(const std::string& source_code) {
 }
 
 void Compiler::Build(const Module& module, const std::string& code) {
+  // VLOG(-1) << module -> infer_shape_func;
   if (target_.arch == Target::Arch::NVGPU) {
     CompileCudaModule(module, code);
   } else if (target_.arch == Target::Arch::X86) {
@@ -236,6 +237,9 @@ void Compiler::Build(const Module& module, const std::string& code) {
   } else {
     CINN_NOT_IMPLEMENTED
   }
+}
+void Compiler::BuildInferShape(const Module& module) {
+  CompileX86Module(module);
 }
 
 std::string Compiler::GetSourceCode(const ir::Module& module) {

@@ -108,6 +108,7 @@ class Compiler final {
    * Compile and link to a CINN module.
    */
   void Build(const ir::Module& module, const std::string& code = "");
+  void BuildInferShape(const ir::Module& module);
 
   void ExportObject(const std::string& path);
 

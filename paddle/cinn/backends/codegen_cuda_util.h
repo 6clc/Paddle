@@ -160,6 +160,7 @@ struct CollectBucketStrategyHostFunctionVisitor
 
  private:
   void Visit(const ir::_Module_* op, Expr* expr) {
+    VLOG(-1) << "split host cuda module";
     CHECK_EQ(op->functions.size(), op->predicates.size());
     for (int i = 0; i < op->functions.size(); ++i) {
       ProcessLoweredFunc(op->functions[i], op->predicates[i]);
@@ -181,6 +182,9 @@ struct CollectBucketStrategyHostFunctionVisitor
                                 {});
     host_module_builder.AddFunctionWithoutOptim(
         host_func.as_lowered_func_ref());
+    VLOG(-1) << op->infer_shape_func;
+    // host_module_builder.AddFunctionWithoutOptim(op->infer_shape_func.as_lowered_func_ref());
+    host_module_builder.AddInferShapeFunc(op->infer_shape_func);
   }
 
   void ProcessLoweredFunc(ir::Expr func, ir::Expr predicate);

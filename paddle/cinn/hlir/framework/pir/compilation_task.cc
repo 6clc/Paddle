@@ -15,6 +15,7 @@
 #pragma once
 
 #include "paddle/cinn/hlir/framework/pir/compilation_task.h"
+#include "paddle/cinn/common/target.h"
 #include "paddle/cinn/hlir/framework/op_lowering.h"
 #include "paddle/cinn/ir/module.h"
 
@@ -23,11 +24,12 @@ namespace hlir {
 namespace framework {
 
 void GroupCompilationContext::SetLoweredFuncs(
-    std::vector<std::pair<ir::SymbolicPredicate, ir::LoweredFunc>>&& funcs) {
-  for (std::pair<ir::SymbolicPredicate, ir::LoweredFunc>& predicate2func :
+    std::vector<std::pair<ir::SymbolicPredicate, std::pair<ir::LoweredFunc, ir::LoweredFunc>>>&& funcs) {
+  for (std::pair<ir::SymbolicPredicate, std::pair<ir::LoweredFunc, ir::LoweredFunc>>& predicate2func :
        funcs) {
     predicates_.push_back(predicate2func.first);
-    lowered_funcs_.push_back(predicate2func.second);
+    lowered_funcs_.push_back(predicate2func.second.second);
+    infer_shape_lowered_funcs_.push_back(predicate2func.second.first);
     ++func_size_;
   }
 }
@@ -67,16 +69,34 @@ void CompilationTask::CodegenAndJit() {
   ir::Module::Builder builder(cinn::common::UniqName("module"),
                               context_->target_);
   CHECK_EQ(context_->predicates_.size(), context_->lowered_funcs_.size());
-  for (const ir::Expr predicate : context_->predicates_) {
+  for (const ir::Expr &predicate : context_->predicates_) {
     builder.AddPredicate(predicate);
   }
   for (const ir::LoweredFunc& func : context_->lowered_funcs_) {
     builder.AddFunction(func);
   }
+  VLOG(-1) << "ddddd ";
+  VLOG(-1) << context_ -> infer_shape_lowered_funcs_[0];
+  VLOG(-1) << "ddddd ";
+  builder.AddInferShapeFunc(context_->infer_shape_lowered_funcs_[0]);
   ir::Module ir_module = builder.Build();
+  VLOG(-1) << "ddddd ";
+  VLOG(-1) << ir_module ->infer_shape_func;
+  VLOG(-1) << "ddddd ";
 
   context_->backend_compiler_ = backends::Compiler::Create(context_->target_);
+  VLOG(-1) << "ddddd ";
   context_->backend_compiler_->Build(ir_module, "");
+  VLOG(-1) << "ddddd ";
+
+  // ir::Module::Builder infer_shape_builder(cinn::common::UniqName("infer_shape_module"),
+  //                             common::DefaultHostTarget());
+  // infer_shape_builder.AddFunction(context_->infer_shape_lowered_funcs_[0]);
+  // infer_shape_builder.AddPredicate(ir::Expr(true));
+  // ir::Module infer_shape_module =  infer_shape_builder.Build();
+  //
+  // VLOG(-1) << infer_shape_module.functions()[0];
+  // context_->backend_compiler_->BuildInferShape(infer_shape_module);
 }
 
 std::unique_ptr<Instruction> CompilationTask::BuildInstruction() {
@@ -89,6 +109,8 @@ std::unique_ptr<Instruction> CompilationTask::BuildInstruction() {
                                     fn_name);
   VLOG(4) << "Lookup kernel name: " << fn_name;
   auto* fn_ptr = context_->backend_compiler_->Lookup(fn_name);
+  auto* infer_shape_fn_ptr =
+      context_->backend_compiler_->Lookup("infer_shape" + fn_name);
   CHECK(fn_ptr);
   instr->SetLoweredFunc(reinterpret_cast<void*>(fn_ptr), fn_name);
   instr->Finalize();

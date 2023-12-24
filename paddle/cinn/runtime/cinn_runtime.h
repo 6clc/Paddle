@@ -425,7 +425,6 @@ static inline int32_t cinn_max(int32_t a, int32_t b) { return a > b ? a : b; }
   while (false)                                                    \
     ;  // NOLINT
 
-#endif  // CINN_RUNTIME_CINN_RUNTIME_H_
 
 union cinn_value_t {
   int64_t v_int64;
@@ -610,3 +609,4 @@ template <typename T>
 cinn_type_t cinn_type_of();
 
 #endif  // __cplusplus
+#endif  // CINN_RUNTIME_CINN_RUNTIME_H_
